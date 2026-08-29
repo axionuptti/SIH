@@ -403,3 +403,74 @@ body {
     box-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
+
+/* ==========================================================================
+   Responsive Layout (Mobile & Tablet)
+   ========================================================================== */
+@media (max-width: 992px) {
+    .dashboard-container {
+        flex-direction: column-reverse;
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .sidebar {
+        width: 100% !important;
+        height: 45vh !important;
+        flex: none;
+    }
+
+    .map-wrapper {
+        width: 100% !important;
+        height: 55vh !important;
+        flex: none;
+        border-radius: 12px;
+    }
+
+    /* Make Live Feed a full-screen overlay on mobile */
+    .right-panel {
+        position: fixed !important;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100% !important;
+        height: 100vh !important;
+        z-index: 9999;
+        border-radius: 0 !important;
+        background: rgba(15, 15, 20, 0.98) !important;
+    }
+
+    /* Center critical alert perfectly on mobile */
+    #critical-alert {
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        top: 12px !important;
+        padding: 6px 16px !important;
+        font-size: 0.75rem !important;
+        border-radius: 20px !important;
+    }
+
+    #open-panel-btn {
+        top: 12px !important;
+        right: 12px !important;
+        padding: 6px 12px !important;
+        font-size: 0.8rem !important;
+    }
+
+    .stats-grid {
+        gap: 8px;
+    }
+    
+    .stat-card {
+        padding: 10px;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    /* Optimize Leaflet Popups for Mobile */
+    .leaflet-popup-content {
+        margin: 12px !important;
+        width: 260px !important;
+    }
+}
