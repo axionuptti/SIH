@@ -397,8 +397,9 @@ body {
 
 /* Fix Leaflet tile gap grid lines (subpixel rendering square grids) */
 .leaflet-tile-container img {
-    width: calc(100% + 1px) !important;
-    height: calc(100% + 1px) !important;
+    /* Scale slightly to hide fractional pixel gaps on some zooms */
+    transform: scale(1.005);
+    transform-origin: center;
     box-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
