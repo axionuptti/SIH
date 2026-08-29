@@ -4,7 +4,7 @@
 > **Smart India Hackathon (SIH) 2026 — Prototype**  
 > AI-driven, satellite-powered anomaly detection and tactical threat classification across the Indian subcontinent.
 
-🚀 **Live Vercel Deployment:** [https://sih-geo-ai-git-main-axion-3f5c.vercel.app/](https://sih-geo-ai-git-main-axion-3f5c.vercel.app/)
+🚀 **Live Vercel Deployment:** [https://sih-geo-ai.vercel.app/](https://sih-geo-ai.vercel.app/)
 
 ---
 
