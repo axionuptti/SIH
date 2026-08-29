@@ -37,16 +37,21 @@ window.toggleFullScreen = function(e) {
     window.isFullScreen = !window.isFullScreen;
     const sidebar = document.querySelector('.sidebar');
     if (window.isFullScreen) {
-        sidebar.style.display = 'none';
+        sidebar.classList.add('fullscreen-hide');
         document.getElementById('critical-alert').style.left = '50%';
     } else {
-        sidebar.style.display = 'flex';
+        sidebar.classList.remove('fullscreen-hide');
         // Reset to responsive centering logic
         if (window.innerWidth > 992) {
             document.getElementById('critical-alert').style.left = 'calc(360px + (100vw - 360px) / 2)';
         }
     }
-    setTimeout(() => map.invalidateSize(), 300);
+    // Keep map perfectly synced during the 400ms CSS slide animation
+    const resizeInterval = setInterval(() => map.invalidateSize(), 20);
+    setTimeout(() => {
+        clearInterval(resizeInterval);
+        map.invalidateSize();
+    }, 450);
 };
 
 // ─── Layer Groups ─────────────────────────────────────────────────────────────
