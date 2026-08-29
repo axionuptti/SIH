@@ -409,21 +409,26 @@ body {
 @media (max-width: 992px) {
     .dashboard-container {
         flex-direction: column-reverse;
-        padding: 8px;
-        gap: 8px;
+        padding: 0;
+        gap: 0;
+        height: auto;
+        min-height: 100vh;
     }
 
     .sidebar {
         width: 100% !important;
-        height: 45vh !important;
+        height: auto !important;
+        padding: 16px;
         flex: none;
+        border-radius: 0;
     }
 
     .map-wrapper {
         width: 100% !important;
-        height: 55vh !important;
+        height: 100vh !important;
+        height: 100dvh !important; /* Fix for iOS Safari bottom bar */
         flex: none;
-        border-radius: 12px;
+        border-radius: 0;
     }
 
     /* Make Live Feed a full-screen overlay on mobile */
@@ -437,15 +442,8 @@ body {
         background: rgba(15, 15, 20, 0.98) !important;
     }
 
-    /* Center critical alert perfectly on mobile */
-    #critical-alert {
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        width: 90% !important;
-        top: 12px !important;
-        padding: 6px 16px !important;
-        font-size: 0.75rem !important;
-        border-radius: 20px !important;
+    #critical-alert, .floating-header {
+        display: none !important;
     }
 
     #open-panel-btn {

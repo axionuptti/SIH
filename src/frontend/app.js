@@ -84,7 +84,7 @@ const overlayMaps = {
     "⛏️ Mining / Quarries":        layerGroups['Mining / Quarry Area'],
 };
 
-L.control.layers(null, overlayMaps, { collapsed: false, position: 'bottomleft' }).addTo(map);
+L.control.layers(null, overlayMaps, { collapsed: true, position: 'bottomleft' }).addTo(map);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
