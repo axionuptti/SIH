@@ -22,6 +22,11 @@ app.add_middleware(
 os.makedirs("src/frontend", exist_ok=True)
 app.mount("/dashboard", StaticFiles(directory="src/frontend", html=True), name="frontend")
 
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard")
+
 ZONES_DIR = "data/raw/zones"
 
 # ─── Helper ──────────────────────────────────────────────────────────────────
