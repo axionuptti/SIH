@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Reliance Jamnagar Refinery",
+        "landuse": "industrial",
+        "industrial": "oil_refinery"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [69.83, 22.31],
+            [69.89, 22.31],
+            [69.89, 22.38],
+            [69.83, 22.38],
+            [69.83, 22.31]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2026-08-28T15:33:47.130934",
+    "training_samples": 10000,
+    "feature_cols": [
+      "frp",
+      "brightness",
+      "is_industrial",
+      "ch4_concentration",
+      "aerosol_index",
+      "day_night",
+      "persistence",
+      "temperature",
+      "humidity",
+      "wind_speed"
+    ],
+    "class_map": {
+      "0": "Wildfire / Natural",
+      "1": "Industrial Flare",
+      "2": "Accidental Industrial Fire",
+      "3": "Gas Leakage (Chemical)",
+      "4": "Smoke Plume"
+    },
+    "gradient_boosting": {
+      "test_accuracy": 1.0,
+      "cv_f1_macro_mean": 1.0,
+      "cv_f1_macro_std": 0.0,
+      "hyperparams": {
+        "max_iter": 500,
+        "max_leaf_nodes": 63,
+        "learning_rate": 0.05,
+        "class_weight": "balanced"
+      }
+    },
+    "random_forest": {
+      "test_accuracy": 1.0,
+      "feature_importances": {
+        "frp": 0.1459,
+        "brightness": 0.1498,
+        "is_industrial": 0.0592,
+        "ch4_concentration": 0.2698,
+        "aerosol_index": 0.232,
+        "day_night": 0.0,
+        "persistence": 0.0637,
+        "temperature": 0.0038,
+        "humidity": 0.008,
+        "wind_speed": 0.0677
+      }
+    },
+    "class_distribution": {
+      "0": 3952,
+      "1": 3542,
+      "2": 985,
+      "3": 842,
+      "4": 679
+    }
+  }
+]
