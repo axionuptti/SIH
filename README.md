@@ -283,7 +283,7 @@ venv\Scripts\activate      # Windows
 
 ### Step 3: Install Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-ml.txt
 ```
 
 > **Note for Apple Silicon (M1/M2/M3/M4):** If you encounter issues with fiona, rasterio, or gdal:
