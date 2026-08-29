@@ -17,6 +17,33 @@ const darkOverlay = L.tileLayer(
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+// Fullscreen Control
+const fullScreenControl = L.control({ position: 'bottomright' });
+fullScreenControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-fullscreen');
+    div.innerHTML = `<a href="#" title="Toggle Fullscreen" onclick="window.toggleFullScreen(event)">⛶</a>`;
+    return div;
+};
+fullScreenControl.addTo(map);
+
+window.isFullScreen = false;
+window.toggleFullScreen = function(e) {
+    if (e) e.preventDefault();
+    window.isFullScreen = !window.isFullScreen;
+    const sidebar = document.querySelector('.sidebar');
+    if (window.isFullScreen) {
+        sidebar.style.display = 'none';
+        document.getElementById('critical-alert').style.left = '50%';
+    } else {
+        sidebar.style.display = 'flex';
+        // Reset to responsive centering logic
+        if (window.innerWidth > 992) {
+            document.getElementById('critical-alert').style.left = 'calc(360px + (100vw - 360px) / 2)';
+        }
+    }
+    setTimeout(() => map.invalidateSize(), 300);
+};
+
 // ─── Layer Groups ─────────────────────────────────────────────────────────────
 const layerGroups = {
     'Accidental Industrial Fire':           L.layerGroup(),
@@ -223,7 +250,7 @@ function buildPopupHTML(feature) {
                 </div>
                 ${(cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire' || cls === 'Industrial Flare') ? `
                 <div style="grid-column:1/-1; margin-top:6px;">
-                    <button onclick="const el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none';" 
+                    <button onclick="window.toggleEvacPlan(this, ${p.latitude}, ${p.longitude}, ${parseFloat(frp||0)}, '${cls}')" 
                             style="width:100%; background:${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}; color:${cls === 'Industrial Flare' ? '#6ee7b7' : '#fca5a5'}; border:1px solid ${cls === 'Industrial Flare' ? '#10b981' : '#dc2626'}; padding:6px; border-radius:4px; font-family:'Outfit'; font-weight:600; cursor:pointer; font-size:0.75rem; transition: background 0.2s;"
                             onmouseover="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(220, 38, 38, 0.4)'}'"
                             onmouseout="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}'">
@@ -616,6 +643,40 @@ window.flyToIncident = function(lat, lon) {
         animate: true,
         duration: 1.5
     });
+};
+
+// ─── Evacuation Animation ─────────────────────────────────────────────────────
+window.activeEvacCircle = null;
+window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
+    const el = btn.nextElementSibling;
+    const isShowing = el.style.display === 'none';
+    el.style.display = isShowing ? 'block' : 'none';
+    
+    // Clear existing animated circle if any
+    if (window.activeEvacCircle) {
+        map.removeLayer(window.activeEvacCircle);
+        window.activeEvacCircle = null;
+    }
+    
+    // Only draw circle if opening plan for a critical event
+    if (isShowing && (cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire')) {
+        let radiusKm = Math.max(parseFloat(frp) * 0.08, 1.5);
+        if (cls === 'Gas Leakage (Chemical)') radiusKm = Math.max(radiusKm, 2.0);
+        let radiusMeters = radiusKm * 1000;
+        
+        window.activeEvacCircle = L.circle([lat, lon], {
+            color: '#ef4444',
+            fillColor: '#ef4444',
+            fillOpacity: 0.2,
+            radius: radiusMeters,
+            className: 'evac-pulse-circle'
+        }).addTo(map);
+        
+        // Ensure map is zoomed in enough to see the evacuation zone clearly
+        if (map.getZoom() < 13) {
+            map.flyTo([lat, lon], 13, { animate: true, duration: 1.5 });
+        }
+    }
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

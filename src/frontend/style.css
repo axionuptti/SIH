@@ -329,7 +329,7 @@ body {
 
 /* Leaflet Customizations for Premium Feel */
 .leaflet-container {
-    background: transparent;
+    background: #020617; /* Very dark slate, blends with CartoDB dark tiles to hide subpixel gaps */
 }
 .leaflet-container * {
     box-sizing: content-box;
@@ -473,4 +473,25 @@ body {
         margin: 12px !important;
         width: 260px !important;
     }
+}
+
+/* Fullscreen Control Button */
+.leaflet-control-fullscreen a {
+    font-size: 1.2rem !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+}
+
+/* Evacuation Zone Animation */
+.evac-pulse-circle {
+    animation: evacPulseAnim 1.5s ease-out infinite alternate;
+}
+
+@keyframes evacPulseAnim {
+    0% { stroke-width: 1px; fill-opacity: 0.1; }
+    100% { stroke-width: 5px; fill-opacity: 0.4; filter: drop-shadow(0 0 8px rgba(239,68,68,0.8)); }
 }
