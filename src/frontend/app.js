@@ -221,6 +221,33 @@ function buildPopupHTML(feature) {
                         · ${p.satellite || 'VIIRS'}
                     </div>
                 </div>
+                ${(cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire') ? `
+                <div style="grid-column:1/-1; margin-top:6px;">
+                    <button onclick="const el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none';" 
+                            style="width:100%; background:rgba(220, 38, 38, 0.2); color:#fca5a5; border:1px solid #dc2626; padding:6px; border-radius:4px; font-family:'Outfit'; font-weight:600; cursor:pointer; font-size:0.75rem; transition: background 0.2s;"
+                            onmouseover="this.style.background='rgba(220, 38, 38, 0.4)'"
+                            onmouseout="this.style.background='rgba(220, 38, 38, 0.2)'">
+                        🚨 View Evacuation & Action Plan
+                    </button>
+                    <div style="display:none; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.3); padding:8px; border-radius:4px; margin-top:4px;">
+                        <ul style="margin:0; padding-left:18px; font-size:0.75rem; color:#fca5a5; line-height:1.4;">
+                            ${cls === 'Gas Leakage (Chemical)' ? `
+                                <li><strong>Immediate:</strong> Evacuate 2km radius upwind</li>
+                                <li><strong>Dispatch:</strong> HAZMAT response team</li>
+                                <li><strong>Action:</strong> Disable local industrial ignition sources</li>
+                            ` : cls === 'Accidental Industrial Fire' ? `
+                                <li><strong>Immediate:</strong> Establish 1.5km minimum exclusion zone</li>
+                                <li><strong>Dispatch:</strong> Regional emergency & fire services</li>
+                                <li><strong>Action:</strong> Activate facility emergency shutdown</li>
+                            ` : `
+                                <li><strong>Immediate:</strong> Establish firebreak lines ahead of spread</li>
+                                <li><strong>Dispatch:</strong> Request aerial firefighting support</li>
+                                <li><strong>Action:</strong> Issue civilian evacuation orders downwind</li>
+                            `}
+                        </ul>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         </div>`;
 }
