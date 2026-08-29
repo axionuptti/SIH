@@ -4,6 +4,26 @@
 > **Smart India Hackathon (SIH) 2026 — Prototype**  
 > AI-driven, satellite-powered anomaly detection and tactical threat classification across the Indian subcontinent.
 
+🚀 **Live Vercel Deployment:** [https://sih-geo-ai-git-main-axion-3f5c.vercel.app/](https://sih-geo-ai-git-main-axion-3f5c.vercel.app/)
+
+---
+
+## 📸 Live Dashboard Previews
+
+<p align="center">
+  <img src="assets/dashboard_india.png" width="800" alt="All India View">
+  <br>
+  <em>Real-time visualization of AI-classified thermal anomalies across India</em>
+</p>
+
+| Incident Feed & Critical Alerts | AI Classification: Wildfire |
+|:---:|:---:|
+| <img src="assets/dashboard_alert.png" width="400"> | <img src="assets/popup_wildfire.png" width="400"> |
+
+| AI Classification: Gas Leak | AI Classification: Routine Heat |
+|:---:|:---:|
+| <img src="assets/popup_gas_leak.png" width="400"> | <img src="assets/popup_heat.png" width="400"> |
+
 ---
 
 ## 📌 Table of Contents
