@@ -4,6 +4,7 @@ import requests
 import geopandas as gpd
 import pandas as pd
 from math import ceil
+import time
 
 def fetch_weather_for_hotspots(geojson_path):
     print(f"Loading hotspots from {geojson_path} for Weather Context enrichment...")
@@ -40,10 +41,25 @@ def fetch_weather_for_hotspots(geojson_path):
         aqi_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lats}&longitude={lons}&current=european_aqi"
         
         try:
-            w_resp = requests.get(weather_url)
-            a_resp = requests.get(aqi_url)
+            w_resp = None
+            a_resp = None
+            max_retries = 3
             
-            if w_resp.status_code == 200 and a_resp.status_code == 200:
+            for attempt in range(max_retries):
+                w_resp = requests.get(weather_url)
+                a_resp = requests.get(aqi_url)
+                
+                if w_resp.status_code == 200 and a_resp.status_code == 200:
+                    break
+                elif w_resp.status_code == 429 or a_resp.status_code == 429:
+                    if attempt < max_retries - 1:
+                        sleep_time = 2 ** attempt
+                        print(f"Rate limited. Retrying in {sleep_time} seconds...")
+                        time.sleep(sleep_time)
+                        continue
+                break # Exit loop if it's a non-retriable error or success
+            
+            if w_resp and a_resp and w_resp.status_code == 200 and a_resp.status_code == 200:
                 w_data = w_resp.json()
                 a_data = a_resp.json()
                 

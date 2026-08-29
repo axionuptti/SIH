@@ -611,7 +611,10 @@ function loadData() {
             // Update Chart.js donut
             updateAnalyticsChart(counts);
         })
-        .catch(err => console.error('Error loading hotspots:', err));
+        .catch(err => console.error('Error loading hotspots:', err))
+        .finally(() => {
+            setTimeout(loadData, 30000); // Recursive call ensures no overlap
+        });
 }
 
 // ─── Live Clock ───────────────────────────────────────────────────────────────
@@ -686,7 +689,6 @@ window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadData();
-setInterval(loadData, 30000);   // Refresh every 30s
 setInterval(updateClock, 1000);
 updateClock();
 

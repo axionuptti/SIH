@@ -18,7 +18,7 @@ Fixes applied vs. original:
 
 import os
 import math
-import pickle
+import joblib
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from satellite_vision import classify_terrain_from_coordinates
@@ -323,14 +323,13 @@ def run_inference():
     print("=" * 60)
     
     # 1. Load Model
-    model_path = "src/models/saved_models/gradient_boosting_fire_classifier.pkl"
+    model_path = "src/models/saved_models/gradient_boosting_fire_classifier.joblib"
     if not os.path.exists(model_path):
         print(f"❌ Model not found at {model_path}")
         print("   Run: python src/models/train.py")
         return
         
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
+    model = joblib.load(model_path)
     print(f"\n✅ Loaded model from {model_path}")
     
     # 2. Load Processed Hotspot Data

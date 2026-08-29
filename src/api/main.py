@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import json
 import os
@@ -12,6 +13,7 @@ app = FastAPI(
     version="2.0.0",
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,10 +33,19 @@ ZONES_DIR = "data/raw/zones"
 
 # ─── Helper ──────────────────────────────────────────────────────────────────
 
+_GEOJSON_CACHE = {}
+
 def load_geojson(path: str):
     if os.path.exists(path):
+        mtime = os.path.getmtime(path)
+        if path in _GEOJSON_CACHE and _GEOJSON_CACHE[path]["mtime"] == mtime:
+            return _GEOJSON_CACHE[path]["data"]
+            
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            
+        _GEOJSON_CACHE[path] = {"mtime": mtime, "data": data}
+        return data
     return None
 
 

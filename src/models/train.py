@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 from sklearn.utils.class_weight import compute_sample_weight
-import pickle
+import joblib
 
 CLASS_MAP = {
     0: 'Wildfire / Natural',
@@ -120,13 +120,11 @@ def train_model():
     # 9. Save Models
     os.makedirs("src/models/saved_models", exist_ok=True)
     
-    gb_path = "src/models/saved_models/gradient_boosting_fire_classifier.pkl"
-    rf_path = "src/models/saved_models/random_forest_fire_classifier.pkl"
+    gb_path = "src/models/saved_models/gradient_boosting_fire_classifier.joblib"
+    rf_path = "src/models/saved_models/random_forest_fire_classifier.joblib"
     
-    with open(gb_path, 'wb') as f:
-        pickle.dump(model, f)
-    with open(rf_path, 'wb') as f:
-        pickle.dump(rf_model, f)
+    joblib.dump(model, gb_path)
+    joblib.dump(rf_model, rf_path)
     
     # 10. Save Metadata Log (never overwrite — append)
     metadata = {
