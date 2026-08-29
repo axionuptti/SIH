@@ -331,6 +331,9 @@ body {
 .leaflet-container {
     background: transparent;
 }
+.leaflet-container * {
+    box-sizing: content-box;
+}
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background: rgba(15, 15, 20, 0.85);
     backdrop-filter: blur(12px);

@@ -6,13 +6,13 @@ const map = L.map('map', {
 // Satellite base layer
 const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles &copy; Esri' }
+    { attribution: 'Tiles &copy; Esri', detectRetina: true, maxZoom: 19 }
 ).addTo(map);
 
-// Dark map overlay for hybrid view
+// Dark map overlay for hybrid view (contains the map text/labels)
 const darkOverlay = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-    { attribution: '&copy; CartoDB', opacity: 0.6 }
+    { attribution: '&copy; CartoDB', opacity: 0.6, detectRetina: true, maxZoom: 19 }
 ).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
