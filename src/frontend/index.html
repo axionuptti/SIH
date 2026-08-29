@@ -59,6 +59,7 @@
         
         <!-- Sidebar -->
         <aside class="sidebar glass-panel">
+            <button id="mobile-sidebar-close" style="display: none;" onclick="document.querySelector('.sidebar').classList.remove('mobile-show')">✕</button>
             <header class="logo-section">
                 <div class="logo-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -212,6 +213,11 @@
             <!-- Button to open right panel (hidden by default) -->
             <button id="open-panel-btn" class="glass-panel" style="display: block; position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 8px 16px; border: none; cursor: pointer; color: white; font-weight: 500; font-family: 'Outfit', sans-serif;" onclick="toggleRightPanel()">
                 <span style="color:#ef4444; margin-right: 6px;">●</span> Live Feed
+            </button>
+
+            <!-- Mobile Analytics Toggle -->
+            <button id="mobile-analytics-btn" class="glass-panel" style="display: none;" onclick="document.querySelector('.sidebar').classList.add('mobile-show')">
+                📊 View Analytics
             </button>
         </main>
         

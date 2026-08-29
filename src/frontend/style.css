@@ -411,22 +411,65 @@ body {
         flex-direction: column-reverse;
         padding: 0;
         gap: 0;
-        height: auto;
-        min-height: 100vh;
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important; /* Disable all page scrolling */
     }
 
     .sidebar {
+        display: none !important; /* Hidden by default */
+        position: fixed !important;
+        top: 0; left: 0; right: 0; bottom: 0;
         width: 100% !important;
-        height: auto !important;
+        height: 100vh !important;
+        height: 100dvh !important;
         padding: 16px;
-        flex: none;
+        z-index: 10000;
+        background: rgba(15, 15, 20, 0.98) !important;
+        overflow-y: auto !important;
         border-radius: 0;
+    }
+
+    .sidebar.mobile-show {
+        display: flex !important; /* Show when class is added */
+    }
+
+    #mobile-sidebar-close {
+        display: flex !important;
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 10001;
+    }
+
+    #mobile-analytics-btn {
+        display: flex !important;
+        position: absolute;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        padding: 12px 24px;
+        border: none;
+        color: white;
+        font-weight: 600;
+        font-size: 0.9rem;
+        font-family: 'Outfit';
+        border-radius: 30px;
+        background: rgba(15, 15, 20, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
     .map-wrapper {
         width: 100% !important;
         height: 100vh !important;
-        height: 100dvh !important; /* Fix for iOS Safari bottom bar */
+        height: 100dvh !important;
         flex: none;
         border-radius: 0;
     }
