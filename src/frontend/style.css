@@ -443,6 +443,10 @@ body {
         display: flex !important; /* Show when class is added */
     }
 
+    .leaflet-control-fullscreen {
+        display: none !important;
+    }
+
     #mobile-sidebar-close {
         display: flex !important;
         position: absolute;
