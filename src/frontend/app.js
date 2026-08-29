@@ -1,18 +1,23 @@
 // ─── Map Initialization ──────────────────────────────────────────────────────
+const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
+
 const map = L.map('map', {
-    zoomControl: false
+    zoomControl: false,
+    minZoom: 3, // Prevent zooming out too far into empty space
+    maxBounds: worldBounds, // Restrict panning to a single Earth
+    maxBoundsViscosity: 1.0 // Solid bounds
 }).setView([22.0, 79.0], 5);
 
 // Satellite base layer
 const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles &copy; Esri' }
+    { attribution: 'Tiles &copy; Esri', noWrap: true }
 ).addTo(map);
 
 // Dark map overlay for hybrid view (contains the map text/labels)
 const darkOverlay = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-    { attribution: '&copy; CartoDB', opacity: 0.6 }
+    { attribution: '&copy; CartoDB', opacity: 0.6, noWrap: true }
 ).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
