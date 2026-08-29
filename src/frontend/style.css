@@ -91,6 +91,8 @@ body {
     padding: 16px 20px;
     flex-shrink: 0;
     transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    will-change: margin-left, opacity;
+    transform: translateZ(0); /* Force GPU layer */
 }
 
 .sidebar.fullscreen-hide {
@@ -409,6 +411,14 @@ body {
     margin-left: -1px !important;
 }
 
+.critical-alert {
+    position: absolute;
+    top: 20px;
+    left: calc(360px + (100vw - 360px) / 2); /* Desktop default center */
+    transform: translateX(-50%) translateZ(0); /* translateZ forces GPU */
+    will-change: left;
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 /* ==========================================================================
    Responsive Layout (Mobile & Tablet)
