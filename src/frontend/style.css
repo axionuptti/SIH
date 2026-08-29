@@ -396,11 +396,13 @@ body {
 .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
 
 /* Fix Leaflet tile gap grid lines (subpixel rendering square grids) */
-.leaflet-tile-container img {
-    /* Scale slightly to hide fractional pixel gaps on some zooms */
-    transform: scale(1.005);
-    transform-origin: center;
-    box-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
+.leaflet-tile {
+    /* Slightly overlap tiles by 1px to close fractional subpixel gaps natively */
+    width: 257px !important;
+    height: 257px !important;
+    border: none !important;
+    box-shadow: none !important;
+    -webkit-backface-visibility: hidden;
 }
 
 
