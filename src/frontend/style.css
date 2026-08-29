@@ -397,12 +397,9 @@ body {
 
 /* Fix Leaflet tile gap grid lines (subpixel rendering square grids) */
 .leaflet-tile {
-    /* Slightly overlap tiles by 1px to close fractional subpixel gaps natively */
-    width: 257px !important;
-    height: 257px !important;
-    border: none !important;
-    box-shadow: none !important;
-    -webkit-backface-visibility: hidden;
+    /* Standard negative margin overlap to fix Safari/Webkit fractional grid gaps */
+    margin-top: -1px !important;
+    margin-left: -1px !important;
 }
 
 
