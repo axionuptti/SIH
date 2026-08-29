@@ -221,16 +221,16 @@ function buildPopupHTML(feature) {
                         · ${p.satellite || 'VIIRS'}
                     </div>
                 </div>
-                ${(cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire') ? `
+                ${(cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire' || cls === 'Industrial Flare') ? `
                 <div style="grid-column:1/-1; margin-top:6px;">
                     <button onclick="const el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none';" 
-                            style="width:100%; background:rgba(220, 38, 38, 0.2); color:#fca5a5; border:1px solid #dc2626; padding:6px; border-radius:4px; font-family:'Outfit'; font-weight:600; cursor:pointer; font-size:0.75rem; transition: background 0.2s;"
-                            onmouseover="this.style.background='rgba(220, 38, 38, 0.4)'"
-                            onmouseout="this.style.background='rgba(220, 38, 38, 0.2)'">
-                        🚨 View Evacuation & Action Plan
+                            style="width:100%; background:${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}; color:${cls === 'Industrial Flare' ? '#6ee7b7' : '#fca5a5'}; border:1px solid ${cls === 'Industrial Flare' ? '#10b981' : '#dc2626'}; padding:6px; border-radius:4px; font-family:'Outfit'; font-weight:600; cursor:pointer; font-size:0.75rem; transition: background 0.2s;"
+                            onmouseover="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(220, 38, 38, 0.4)'}'"
+                            onmouseout="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}'">
+                        ${cls === 'Industrial Flare' ? '📋 View Monitoring Protocol' : '🚨 View Evacuation & Action Plan'}
                     </button>
-                    <div style="display:none; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.3); padding:8px; border-radius:4px; margin-top:4px;">
-                        <ul style="margin:0; padding-left:18px; font-size:0.75rem; color:#fca5a5; line-height:1.4;">
+                    <div style="display:none; background:${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)'}; border:1px solid ${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(220, 38, 38, 0.3)'}; padding:8px; border-radius:4px; margin-top:4px;">
+                        <ul style="margin:0; padding-left:18px; font-size:0.75rem; color:${cls === 'Industrial Flare' ? '#6ee7b7' : '#fca5a5'}; line-height:1.4;">
                             ${cls === 'Gas Leakage (Chemical)' ? `
                                 <li><strong>Immediate:</strong> Evacuate 2km radius upwind</li>
                                 <li><strong>Dispatch:</strong> HAZMAT response team</li>
@@ -239,6 +239,10 @@ function buildPopupHTML(feature) {
                                 <li><strong>Immediate:</strong> Establish 1.5km minimum exclusion zone</li>
                                 <li><strong>Dispatch:</strong> Regional emergency & fire services</li>
                                 <li><strong>Action:</strong> Activate facility emergency shutdown</li>
+                            ` : cls === 'Industrial Flare' ? `
+                                <li><strong>Immediate:</strong> Compare intensity against historical 30-day baseline</li>
+                                <li><strong>Dispatch:</strong> Not required (Routine Operation)</li>
+                                <li><strong>Action:</strong> Log thermal emissions for regulatory compliance</li>
                             ` : `
                                 <li><strong>Immediate:</strong> Establish firebreak lines ahead of spread</li>
                                 <li><strong>Dispatch:</strong> Request aerial firefighting support</li>
