@@ -20,7 +20,7 @@ SOURCES = {
     "MODIS_NRT":        {"resolution": "1km",  "priority": 3, "desc": "Terra/Aqua MODIS (broader coverage, 1km)"},
 }
 
-def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=5):
+def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=1):
     """
     Fetch active fire / thermal anomaly data from NASA FIRMS NRT API.
     
@@ -35,9 +35,13 @@ def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=5):
     try:
         response = requests.get(url, timeout=30)
         
+        if response.status_code == 429 or "rate limit" in response.text.lower():
+            print(f"  ⚠️  RATE LIMIT REACHED for {source}. NASA API limits exceeded.")
+            return None
+            
         if response.status_code == 200:
             if "Error" in response.text or len(response.text.strip()) < 50:
-                print(f"  ⚠️  FIRMS returned error or empty response for {source}")
+                print(f"  ⚠️  FIRMS returned error or empty response for {source}: {response.text[:100]}")
                 return None
             
             os.makedirs("data/raw", exist_ok=True)
@@ -173,7 +177,7 @@ if __name__ == "__main__":
         print("🛰️  Fetching multi-source FIRMS data for India...")
         dfs = {}
         for source in SOURCES:
-            dfs[source] = fetch_firms_data(api_key, source=source, days=5)
+            dfs[source] = fetch_firms_data(api_key, source=source, days=1)
         
         merged = merge_multi_source(dfs)
         if not merged.empty:

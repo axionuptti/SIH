@@ -3,10 +3,11 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 
 const map = L.map('map', {
     zoomControl: false,
-    preferCanvas: true, // Force GPU hardware acceleration
+    // preferCanvas: true, (REMOVED: causes severe white grid lines in Safari WebKit)
     minZoom: 3, // Prevent zooming out too far into empty space
     maxBounds: worldBounds, // Restrict panning to a single Earth
-    maxBoundsViscosity: 1.0 // Solid bounds
+    maxBoundsViscosity: 1.0, // Solid bounds
+    zoomSnap: 0 // Prevent fractional zooming rounding errors
 }).setView([22.0, 79.0], 5);
 
 // Satellite base layer
@@ -746,7 +747,7 @@ function loadData() {
         })
         .catch(err => console.error('Error loading hotspots:', err))
         .finally(() => {
-            setTimeout(loadData, 30000); // Recursive call ensures no overlap
+            setTimeout(loadData, 15000); // Recursive call ensures no overlap
         });
 }
 

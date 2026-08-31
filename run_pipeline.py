@@ -94,7 +94,7 @@ def run_pipeline(full: bool = False, skip_osm: bool = False, skip_train: bool = 
     def _stage1():
         dfs = {}
         for source in SOURCES:
-            dfs[source] = fetch_firms_data(api_key, source=source, days=5)
+            dfs[source] = fetch_firms_data(api_key, source=source, days=1)
         merged = merge_multi_source(dfs)
         if not merged.empty:
             from datetime import datetime as dt

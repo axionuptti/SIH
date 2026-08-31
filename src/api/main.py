@@ -6,12 +6,28 @@ from fastapi.responses import JSONResponse
 import json
 import os
 from pathlib import Path
+import asyncio
+import subprocess
 
 app = FastAPI(
     title="Geo-AI Fire Sentinel API",
     description="Real-time fire classification + land zone mapping for India",
     version="2.0.0",
 )
+
+@app.on_event("startup")
+async def startup_event():
+    async def sync_loop():
+        while True:
+            # NASA FIRMS satellites (VIIRS/MODIS) only pass over India 2-4 times a day.
+            # Polling every 15 seconds will get your API key banned by NASA for rate limiting.
+            # 10 minutes (600s) is a safe interval to catch the next satellite overpass.
+            await asyncio.sleep(600)
+            try:
+                subprocess.Popen(["python", "run_pipeline.py", "--skip-osm", "--skip-train"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+    asyncio.create_task(sync_loop())
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
