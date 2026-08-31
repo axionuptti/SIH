@@ -564,6 +564,8 @@ function loadData() {
         .then(r => r.json())
         .then(data => {
             if (data.error) return;
+            
+            updateAcquisitionTime(data.features);
 
             // Capture currently open popup to restore it after refresh
             let openPopupCoords = null;
@@ -748,15 +750,31 @@ function loadData() {
         });
 }
 
-// ─── Live Clock ───────────────────────────────────────────────────────────────
-function updateClock() {
+// ─── Acquisition Time Sync ───────────────────────────────────────────────────
+function updateAcquisitionTime(features) {
     const el = document.getElementById('current-time');
-    if (el) {
-        const now = new Date();
-        el.innerText = now.toLocaleTimeString('en-IN', {
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
+    if (!el || !features || !features.length) return;
+    
+    let latestTimestamp = 0;
+    features.forEach(f => {
+        if (f.properties && f.properties.acq_date && f.properties.acq_time) {
+            const timeStr = String(f.properties.acq_time).padStart(4, '0');
+            const dateStr = `${f.properties.acq_date.split('T')[0]}T${timeStr.slice(0,2)}:${timeStr.slice(2)}:00Z`;
+            const ts = new Date(dateStr).getTime();
+            if (ts > latestTimestamp) latestTimestamp = ts;
+        }
+    });
+    
+    if (latestTimestamp > 0) {
+        const latestDate = new Date(latestTimestamp);
+        const timeFormatted = latestDate.toLocaleTimeString('en-IN', {
+            hour: '2-digit', minute: '2-digit',
             timeZone: 'Asia/Kolkata', hour12: false
-        }) + ' IST';
+        });
+        const dateFormatted = latestDate.toLocaleDateString('en-IN', {
+            month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata'
+        });
+        el.innerText = `Data Acquired: ${dateFormatted} ${timeFormatted} IST`;
     }
 }
 
@@ -820,8 +838,7 @@ window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadData();
-setInterval(updateClock, 1000);
-updateClock();
+// Data syncs on loadData
 
 // ─── Right Panel Toggle ───────────────────────────────────────────────────────
 window.toggleRightPanel = function() {
