@@ -24,3 +24,7 @@ folium>=0.15
 matplotlib>=3.7
 seaborn>=0.12
 jupyter>=1.0
+
+# Deep Learning / Advanced Vision
+torch>=2.0.0
+torchvision>=0.15.0

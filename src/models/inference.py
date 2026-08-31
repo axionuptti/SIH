@@ -21,7 +21,13 @@ import math
 import joblib
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from satellite_vision import classify_terrain_from_coordinates
+from src.models.satellite_vision import classify_terrain_from_coordinates
+import sys
+import os
+
+# Ensure src.data is accessible
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from src.data.ingest_bhuvan import fetch_bhuvan_zoning
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -218,13 +224,16 @@ def calculate_phenomenon_footprint(cls: str, lat: float, lon: float, w_speed: fl
         # Current fire perimeter (a smaller Rothermel ellipse)
         return calculate_spread_polygon(lat, lon, w_speed, w_dir, frp * 0.2)
         
-    elif cls == 'Accidental Industrial Fire':
+    elif cls == 'Agricultural Burn':
+        return calculate_spread_polygon(lat, lon, w_speed, w_dir, frp * 0.15)
+        
+    elif cls == 'Accidental Industrial Fire' or cls == 'Urban/Residential Fire':
         # Intense circular burn radius
         radius = max(frp * 0.01, 0.2)
         return calculate_circle_polygon(lat, lon, radius)
         
     else:
-        # Flare
+        # Flare (Industrial or Offshore)
         return calculate_circle_polygon(lat, lon, 0.15)
 
 
@@ -367,6 +376,19 @@ def run_inference():
     for idx, p in enumerate(preds):
         predicted_class = CLASS_MAP[p]
         zone_type = str(X.iloc[idx].get('zone_type', 'none'))
+        lat = float(gdf.iloc[idx]['latitude'])
+        lon = float(gdf.iloc[idx]['longitude'])
+        
+        # If OSM didn't find a zone, use ISRO Bhuvan High-Precision WMS
+        if zone_type == 'none':
+            bhuvan_zone = fetch_bhuvan_zoning(lat, lon).lower()
+            if 'industrial' in bhuvan_zone or 'refinery' in bhuvan_zone or 'power plant' in bhuvan_zone or 'mining' in bhuvan_zone:
+                zone_type = 'industrial'
+            elif 'agri' in bhuvan_zone or 'crop' in bhuvan_zone:
+                zone_type = 'agricultural'
+            elif 'forest' in bhuvan_zone:
+                zone_type = 'forest'
+
         is_industrial = float(X.iloc[idx].get('is_industrial', 0.0))
         
         # Hard Override: Split Wildfire / Natural based on zone_type
@@ -375,16 +397,22 @@ def run_inference():
                 predicted_class = 'Wildfire'
             elif zone_type in ['industrial', 'mining'] or is_industrial >= 1.0:
                 predicted_class = 'Routine Industrial Heat'
+            elif zone_type == 'agricultural':
+                predicted_class = 'Agricultural Burn'
             else:
                 # Visual verification via Local Image Processing!
                 lat = float(gdf.iloc[idx]['latitude'])
                 lon = float(gdf.iloc[idx]['longitude'])
                 cv_terrain = classify_terrain_from_coordinates(lat, lon)
                 
-                if cv_terrain == "Industrial/Manmade":
+                if cv_terrain == "Water/Offshore":
+                    predicted_class = 'Offshore Rig Flare'
+                elif cv_terrain == "Industrial/Manmade":
                     predicted_class = 'Accidental Industrial Fire' # User requested: Industrial Anomaly
                 elif cv_terrain == "Forest/Green":
                     predicted_class = 'Wildfire' # User requested: Forest Fire
+                elif cv_terrain == "Agricultural/Crop":
+                    predicted_class = 'Agricultural Burn'
                 else:
                     predicted_class = 'Natural Anomaly' # User requested: Natural Anomaly
                 
@@ -417,6 +445,7 @@ def run_inference():
             is_massive_heat = frp > 10.0 and brightness > 352.0
             is_sudden = persistence < 0.4
             is_verified = (cross_source > 1) or (confidence_val > 85.0)
+            is_ind = float(X.iloc[idx].get('is_industrial', 0.0))
             
             if is_massive_heat and is_sudden and is_verified:
                 # USER DEMAND: The Image Model MUST visually verify that it is an industrial location!
@@ -424,14 +453,30 @@ def run_inference():
                 lon = float(gdf.iloc[idx]['longitude'])
                 cv_terrain = classify_terrain_from_coordinates(lat, lon)
                 
-                if cv_terrain == "Industrial/Manmade":
-                    final_classes.append('Accidental Industrial Fire')
+                if cv_terrain == "Water/Offshore":
+                    final_classes.append('Offshore Rig Flare')
+                elif cv_terrain == "Industrial/Manmade":
+                    if is_ind >= 1.0:
+                        final_classes.append('Accidental Industrial Fire')
+                    else:
+                        final_classes.append('Urban/Residential Fire')
                 elif cv_terrain == "Forest/Green":
                     final_classes.append('Wildfire')
+                elif cv_terrain == "Agricultural/Crop":
+                    final_classes.append('Agricultural Burn')
                 else:
                     final_classes.append('Natural Anomaly')
             else:
-                final_classes.append('Routine Industrial Heat')
+                # To prevent calling the API thousands of times, only check for offshore if it's a persistent flare NOT in an industrial zone
+                if cls_name == 'Industrial Flare' and is_ind == 0.0:
+                    lat = float(gdf.iloc[idx]['latitude'])
+                    lon = float(gdf.iloc[idx]['longitude'])
+                    if classify_terrain_from_coordinates(lat, lon) == "Water/Offshore":
+                        final_classes.append('Offshore Rig Flare')
+                    else:
+                        final_classes.append('Routine Industrial Heat')
+                else:
+                    final_classes.append('Routine Industrial Heat')
         elif cls_name == 'Wildfire':
             brightness = float(X.iloc[idx].get('brightness', 0.0))
             # A true active forest fire should have a significant brightness signature (flames)
@@ -501,12 +546,25 @@ def run_inference():
             strat = "Monitor"
             poly = calculate_spread_polygon(lat, lon, w_speed, w_dir, frp)
 
+        elif cls == 'Agricultural Burn':
+            speed = (w_speed * 0.08) + (frp * 0.01)
+            risk = "Low (Agricultural Hazard)"
+            strat = "Issue Local Admin Warning"
+            poly = calculate_spread_polygon(lat, lon, w_speed, w_dir, frp)
+
         elif cls == 'Accidental Industrial Fire':
             speed = (w_speed * 0.06) + (frp * 0.002)
             risk = "Extreme (Explosion / Structural Hazard)"
             strat = "Establish Evacuation Perimeter"
             poly = calculate_spread_polygon(lat, lon, w_speed, w_dir, frp)
             mit_geom = calculate_evacuation_perimeter(lat, lon, frp)
+            mit_type = "Evacuation"
+
+        elif cls == 'Urban/Residential Fire':
+            speed = (w_speed * 0.05) + (frp * 0.005)
+            risk = "Critical (Life Safety Hazard)"
+            strat = "Dispatch City Fire Department + Evacuate Block"
+            mit_geom = calculate_evacuation_perimeter(lat, lon, max(frp * 0.5, 1.0))
             mit_type = "Evacuation"
 
         elif cls == 'Gas Leakage (Chemical)':
@@ -521,6 +579,11 @@ def run_inference():
             risk = "Moderate (Air Quality Hazard)"
             strat = "Issue Health Advisory — AQI Alert"
             poly = calculate_spread_polygon(lat, lon, w_speed, w_dir, frp)
+
+        elif cls == 'Offshore Rig Flare':
+            speed = 0.0
+            risk = "Low (Offshore Operation)"
+            strat = "Monitor via Coast Guard / Marine Data"
 
         elif cls == 'Industrial Flare' or cls == 'Routine Industrial Heat':
             speed = 0.0

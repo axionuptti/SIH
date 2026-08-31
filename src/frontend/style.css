@@ -404,11 +404,11 @@ body {
 .sidebar::-webkit-scrollbar-track { background: transparent; }
 .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
 
-/* Fix Leaflet tile gap grid lines (subpixel rendering square grids) */
-.leaflet-tile {
-    /* Standard negative margin overlap to fix Safari/Webkit fractional grid gaps */
-    margin-top: -1px !important;
-    margin-left: -1px !important;
+/* Fix Leaflet sub-pixel rendering gaps (white grid lines) */
+.leaflet-container img.leaflet-tile {
+    margin: -0.5px !important;
+    width: 257px !important;
+    height: 257px !important;
 }
 
 .critical-alert {

@@ -3,6 +3,7 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 
 const map = L.map('map', {
     zoomControl: false,
+    preferCanvas: true, // Force GPU hardware acceleration
     minZoom: 3, // Prevent zooming out too far into empty space
     maxBounds: worldBounds, // Restrict panning to a single Earth
     maxBoundsViscosity: 1.0 // Solid bounds
@@ -57,11 +58,14 @@ window.toggleFullScreen = function(e) {
 // ─── Layer Groups ─────────────────────────────────────────────────────────────
 const layerGroups = {
     'Accidental Industrial Fire':           L.layerGroup(),
+    'Urban/Residential Fire':               L.layerGroup(),
     'Industrial Flare':                     L.layerGroup(),
+    'Offshore Rig Flare':                   L.layerGroup(),
     'Routine Industrial Heat':              L.layerGroup(),
     'Gas Leakage (Chemical)':               L.layerGroup(),
     'Smoke Plume':                          L.layerGroup(),
     'Wildfire':                             L.layerGroup(),
+    'Agricultural Burn':                    L.layerGroup(),
     'Natural Anomaly':                      L.layerGroup(),
     'Predictive Fire Spread (Hazard Zone)': L.layerGroup(),
     'Tactical AI Mitigations':              L.layerGroup(),
@@ -78,11 +82,14 @@ for (const key in layerGroups) {
 
 const overlayMaps = {
     "🔴 Accidental Fires":         layerGroups['Accidental Industrial Fire'],
+    "💗 Urban Fires":              layerGroups['Urban/Residential Fire'],
     "🟢 Industrial Flares":        layerGroups['Industrial Flare'],
+    "🌊 Offshore Flares":          layerGroups['Offshore Rig Flare'],
     "💡 Routine Industrial Heat":  layerGroups['Routine Industrial Heat'],
     "🟣 Gas Leakages":             layerGroups['Gas Leakage (Chemical)'],
     "⚫ Smoke Plumes":             layerGroups['Smoke Plume'],
     "🔥 Wildfires (Forests)":      layerGroups['Wildfire'],
+    "🌾 Agricultural Burns":       layerGroups['Agricultural Burn'],
     "🟠 Natural Anomalies":        layerGroups['Natural Anomaly'],
     "🔥 Spread Predictions":       layerGroups['Predictive Fire Spread (Hazard Zone)'],
     "🛡️ Tactical Mitigations":     layerGroups['Tactical AI Mitigations'],
@@ -101,11 +108,14 @@ L.control.layers(null, overlayMaps, { collapsed: true, position: 'bottomleft' })
 /** Colour lookup for each fire class */
 const CLASS_COLOURS = {
     'Accidental Industrial Fire': '#ef4444',
+    'Urban/Residential Fire':     '#ec4899',
     'Industrial Flare':           '#10b981',
+    'Offshore Rig Flare':         '#06b6d4',
     'Routine Industrial Heat':    '#84cc16',
     'Gas Leakage (Chemical)':     '#a855f7',
     'Smoke Plume':                '#94a3b8',
     'Wildfire':                   '#f97316',
+    'Agricultural Burn':          '#facc15',
     'Natural Anomaly':            '#f59e0b',
 };
 
@@ -138,6 +148,33 @@ function formatAcqTime(timeStr) {
     const t = String(timeStr).padStart(4, '0');
     return `${t.slice(0, 2)}:${t.slice(2)} UTC`;
 }
+
+// ─── Dynamic Address Fetching for Popups ─────────────────────────────────────
+map.on('popupopen', function(e) {
+    const popupContent = e.popup.getElement();
+    if (!popupContent) return;
+    
+    const addressSpan = popupContent.querySelector('.address-loader');
+    if (addressSpan && addressSpan.innerText === 'Loading...') {
+        const lat = addressSpan.getAttribute('data-lat');
+        const lon = addressSpan.getAttribute('data-lon');
+        
+        if (lat && lon) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+                .then(r => r.json())
+                .then(d => {
+                    const city = d.address.city || d.address.town || d.address.village || d.address.county || '';
+                    const state = d.address.state || '';
+                    const country = d.address.country || d.display_name || 'Unknown';
+                    const fullAddr = `${city ? city + ', ' : ''}${state ? state + ', ' : ''}${country}`;
+                    addressSpan.innerText = fullAddr.replace(/^[ ,]+/, '');
+                })
+                .catch(err => {
+                    addressSpan.innerText = 'Address unavailable';
+                });
+        }
+    }
+});
 
 /** Count up animation */
 function animateValue(id, start, end, duration) {
@@ -222,6 +259,25 @@ function buildPopupHTML(feature) {
                     <div style="color:#64748b; font-size:0.68rem;">Air Quality (AQI)</div>
                     <div style="font-weight:600; color:${aqiColour};">${aqi}</div>
                 </div>
+
+                <div style="grid-column:1/-1; background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; margin-top:4px;">
+                    <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase; margin-bottom:6px; font-weight:600; letter-spacing:0.5px;">Location & Impact</div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:0.75rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:#64748b;">Coordinates:</span>
+                            <span style="font-weight:600;">${parseFloat(p.latitude).toFixed(4)}, ${parseFloat(p.longitude).toFixed(4)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <span style="color:#64748b; min-width:55px;">Address:</span>
+                            <span class="address-loader" data-lat="${p.latitude}" data-lon="${p.longitude}" style="font-weight:600; text-align:right;">Loading...</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:#64748b;">Fire Radius (Est.):</span>
+                            <span style="font-weight:600; color:#ef4444;">${Math.max(parseFloat(frp) * 0.01, 0.2).toFixed(2)} km</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div style="grid-column:1/-1; background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; margin-top:4px;">
                     <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase; margin-bottom:6px; font-weight:600; letter-spacing:0.5px;">Meteorological Conditions</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -258,16 +314,44 @@ function buildPopupHTML(feature) {
                         · ${p.satellite || 'VIIRS'}
                     </div>
                 </div>
-                ${(cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire' || cls === 'Industrial Flare') ? `
+                ${(cls === 'Accidental Industrial Fire' || cls === 'Urban/Residential Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire' || cls === 'Industrial Flare' || cls === 'Offshore Rig Flare') ? `
                 <div style="grid-column:1/-1; margin-top:6px;">
                     <button onclick="window.toggleEvacPlan(this, ${p.latitude}, ${p.longitude}, ${parseFloat(frp||0)}, '${cls}')" 
-                            style="width:100%; background:${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}; color:${cls === 'Industrial Flare' ? '#6ee7b7' : '#fca5a5'}; border:1px solid ${cls === 'Industrial Flare' ? '#10b981' : '#dc2626'}; padding:6px; border-radius:4px; font-family:'Outfit'; font-weight:600; cursor:pointer; font-size:0.75rem; transition: background 0.2s;"
-                            onmouseover="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(220, 38, 38, 0.4)'}'"
-                            onmouseout="this.style.background='${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}'">
-                        ${cls === 'Industrial Flare' ? '📋 View Monitoring Protocol' : '🚨 View Evacuation & Action Plan'}
+                            style="
+                                width:100%;
+                                background:${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(220, 38, 38, 0.15)'};
+                                color:${cls.includes('Flare') ? '#6ee7b7' : '#fca5a5'};
+                                border: 1px solid ${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.4)' : 'rgba(220, 38, 38, 0.4)'};
+                                padding: 8px 12px;
+                                border-radius: 6px;
+                                font-family:'Outfit', sans-serif;
+                                font-weight: 600;
+                                cursor: pointer;
+                                font-size: 0.8rem;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                gap: 6px;
+                                transition: all 0.2s ease-in-out;
+                                box-shadow: 0 4px 12px ${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)'};
+                                backdrop-filter: blur(4px);
+                            "
+                            onmouseover="
+                                this.style.background='${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(220, 38, 38, 0.3)'}';
+                                this.style.transform='translateY(-1px)';
+                                this.style.boxShadow='0 6px 16px ${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(220, 38, 38, 0.2)'}';
+                            "
+                            onmouseout="
+                                this.style.background='${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(220, 38, 38, 0.15)'}';
+                                this.style.transform='translateY(0)';
+                                this.style.boxShadow='0 4px 12px ${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)'}';
+                            "
+                            onmousedown="this.style.transform='translateY(1px)';"
+                            onmouseup="this.style.transform='translateY(-1px)';">
+                        ${cls.includes('Flare') ? '📋 View Monitoring Protocol' : '🚨 View Evacuation & Action Plan'}
                     </button>
-                    <div style="display:none; background:${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)'}; border:1px solid ${cls === 'Industrial Flare' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(220, 38, 38, 0.3)'}; padding:8px; border-radius:4px; margin-top:4px;">
-                        <ul style="margin:0; padding-left:18px; font-size:0.75rem; color:${cls === 'Industrial Flare' ? '#6ee7b7' : '#fca5a5'}; line-height:1.4;">
+                    <div style="display:none; background:${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)'}; border:1px solid ${cls.includes('Flare') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(220, 38, 38, 0.3)'}; padding:8px; border-radius:4px; margin-top:4px;">
+                        <ul style="margin:0; padding-left:18px; font-size:0.75rem; color:${cls.includes('Flare') ? '#6ee7b7' : '#fca5a5'}; line-height:1.4;">
                             ${cls === 'Gas Leakage (Chemical)' ? `
                                 <li><strong>Immediate:</strong> Evacuate 2km radius upwind</li>
                                 <li><strong>Dispatch:</strong> HAZMAT response team</li>
@@ -276,6 +360,14 @@ function buildPopupHTML(feature) {
                                 <li><strong>Immediate:</strong> Establish 1.5km minimum exclusion zone</li>
                                 <li><strong>Dispatch:</strong> Regional emergency & fire services</li>
                                 <li><strong>Action:</strong> Activate facility emergency shutdown</li>
+                            ` : cls === 'Urban/Residential Fire' ? `
+                                <li><strong>Immediate:</strong> Establish local evacuation perimeter</li>
+                                <li><strong>Dispatch:</strong> City Fire Department</li>
+                                <li><strong>Action:</strong> Check residential block power and gas lines</li>
+                            ` : cls === 'Offshore Rig Flare' ? `
+                                <li><strong>Immediate:</strong> Compare intensity against marine baselines</li>
+                                <li><strong>Dispatch:</strong> Coast Guard if structural breach detected</li>
+                                <li><strong>Action:</strong> Log thermal emissions</li>
                             ` : cls === 'Industrial Flare' ? `
                                 <li><strong>Immediate:</strong> Compare intensity against historical 30-day baseline</li>
                                 <li><strong>Dispatch:</strong> Not required (Routine Operation)</li>
@@ -297,11 +389,14 @@ function buildPopupHTML(feature) {
 
 function clearHotspotLayers() {
     layerGroups['Accidental Industrial Fire'].clearLayers();
+    layerGroups['Urban/Residential Fire'].clearLayers();
     layerGroups['Industrial Flare'].clearLayers();
+    layerGroups['Offshore Rig Flare'].clearLayers();
     layerGroups['Routine Industrial Heat'].clearLayers();
     layerGroups['Gas Leakage (Chemical)'].clearLayers();
     layerGroups['Smoke Plume'].clearLayers();
     layerGroups['Wildfire'].clearLayers();
+    layerGroups['Agricultural Burn'].clearLayers();
     layerGroups['Natural Anomaly'].clearLayers();
     layerGroups['Predictive Fire Spread (Hazard Zone)'].clearLayers();
     layerGroups['Tactical AI Mitigations'].clearLayers();
@@ -313,7 +408,7 @@ function updateAnalyticsChart(counts) {
     const ctx = document.getElementById('analyticsChart');
     if (!ctx) return;
     
-    const data = [counts.accidental, counts.leak, counts.smoke, counts.flare, counts.wildfire];
+    const data = [counts.accidental, counts.urban, counts.leak, counts.smoke, counts.flare, counts.offshore, counts.wildfire, counts.agri];
     if (data.every(v => v === 0)) return; // Wait for data
     
     if (analyticsChart) {
@@ -323,10 +418,10 @@ function updateAnalyticsChart(counts) {
         analyticsChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Accidental', 'Gas Leak', 'Smoke', 'Flare', 'Wildfire'],
+                labels: ['Accidental', 'Urban', 'Gas Leak', 'Smoke', 'Flare', 'Offshore', 'Wildfire', 'Agri Burn'],
                 datasets: [{
                     data: data,
-                    backgroundColor: ['#ef4444', '#a855f7', '#94a3b8', '#10b981', '#f59e0b'],
+                    backgroundColor: ['#ef4444', '#ec4899', '#a855f7', '#94a3b8', '#10b981', '#06b6d4', '#f97316', '#facc15'],
                     borderWidth: 0,
                     hoverOffset: 6
                 }]
@@ -358,8 +453,8 @@ function loadData() {
 
     // Track all counters in one object
     let counts = {
-        total: 0, accidental: 0, flare: 0, leak: 0, 
-        smoke: 0, wildfire: 0, routineHeat: 0, naturalAnomaly: 0
+        total: 0, accidental: 0, urban: 0, flare: 0, offshore: 0, leak: 0, 
+        smoke: 0, wildfire: 0, agri: 0, routineHeat: 0, naturalAnomaly: 0
     };
 
     // ── 1. Land Zones ─────────────────────────────────────────────────────
@@ -470,6 +565,12 @@ function loadData() {
         .then(data => {
             if (data.error) return;
 
+            // Capture currently open popup to restore it after refresh
+            let openPopupCoords = null;
+            if (map && map._popup && map.hasLayer(map._popup)) {
+                openPopupCoords = map._popup.getLatLng();
+            }
+
             // Clear only hotspot layers here (after data arrives — prevents flicker)
             clearHotspotLayers();
 
@@ -477,7 +578,7 @@ function loadData() {
                 style: function(feature) {
                     const cls = feature.properties.ai_classification;
                     const colour = CLASS_COLOURS[cls] || '#f59e0b';
-                    const isCritical = cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)';
+                    const isCritical = cls === 'Accidental Industrial Fire' || cls === 'Urban/Residential Fire' || cls === 'Gas Leakage (Chemical)';
                     
                     return {
                         color: colour,
@@ -493,14 +594,17 @@ function loadData() {
 
                     // Accumulate stats
                     if (cls === 'Accidental Industrial Fire') counts.accidental++;
+                    else if (cls === 'Urban/Residential Fire') counts.urban++;
                     else if (cls === 'Industrial Flare') counts.flare++;
+                    else if (cls === 'Offshore Rig Flare') counts.offshore++;
                     else if (cls === 'Routine Industrial Heat') counts.routineHeat++;
                     else if (cls === 'Gas Leakage (Chemical)')counts.leak++;
                     else if (cls === 'Smoke Plume')           counts.smoke++;
                     else if (cls === 'Wildfire') counts.wildfire++;
+                    else if (cls === 'Agricultural Burn') counts.agri++;
                     else if (cls === 'Natural Anomaly') counts.naturalAnomaly++;
 
-                    const isCritical = cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)';
+                    const isCritical = cls === 'Accidental Industrial Fire' || cls === 'Urban/Residential Fire' || cls === 'Gas Leakage (Chemical)';
                     const pixelRadius = isCritical ? 10 : 7;
                     const colour = CLASS_COLOURS[cls] || '#f59e0b';
                     
@@ -534,12 +638,34 @@ function loadData() {
                 window.updateHotspotVisibility();
             }
 
+            // Restore the open popup if there was one
+            if (openPopupCoords) {
+                let matchedLayer = null;
+                let minDist = Infinity;
+                window.hotspotDualLayers.forEach(dl => {
+                    if (dl._circle) {
+                        let ll = dl._circle.getLatLng();
+                        let dist = openPopupCoords.distanceTo(ll);
+                        if (dist < minDist && dist < 50) { // within 50 meters
+                            minDist = dist;
+                            matchedLayer = dl._circle;
+                        }
+                    }
+                });
+                if (matchedLayer) {
+                    matchedLayer.openPopup();
+                }
+            }
+
             // Update stat counters with animation
             animateValue('total-hotspots', 0, counts.total,     1200);
             animateValue('accidental-count', 0, counts.accidental, 1200);
+            animateValue('urban-count', 0, counts.urban, 1200);
             animateValue('leak-count',  0, counts.leak,     1200);
             animateValue('smoke-count', 0, counts.smoke,    1200);
             animateValue('flare-count', 0, counts.flare,    1200);
+            animateValue('offshore-count', 0, counts.offshore, 1200);
+            animateValue('agri-count', 0, counts.agri, 1200);
             animateValue('routine-heat-count', 0, counts.routineHeat, 1200);
             animateValue('wildfire-count', 0, counts.wildfire, 1200);
             animateValue('natural-anomaly-count', 0, counts.naturalAnomaly, 1200);
@@ -547,7 +673,7 @@ function loadData() {
             // Update critical alert banner
             const alertEl = document.getElementById('critical-alert');
             if (alertEl) {
-                const criticalCount = counts.accidental + counts.leak + counts.wildfire;
+                const criticalCount = counts.accidental + counts.urban + counts.leak + counts.wildfire;
                 alertEl.style.display = criticalCount > 0 ? 'flex' : 'none';
                 const alertText = document.getElementById('alert-text');
                 if (alertText) {
@@ -582,9 +708,9 @@ function loadData() {
                         let relativeText = "";
                         let baselineFRP = 1.0; // generic baseline
                         
-                        if (cls === 'Accidental Industrial Fire') {
+                        if (cls === 'Accidental Industrial Fire' || cls === 'Urban/Residential Fire') {
                             baselineFRP = 3.1; // normal industrial heat
-                        } else if (cls === 'Wildfire') {
+                        } else if (cls === 'Wildfire' || cls === 'Agricultural Burn') {
                             baselineFRP = 1.5; // normal natural smolder
                         }
                         
@@ -672,7 +798,7 @@ window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
     }
     
     // Only draw circle if opening plan for a critical event
-    if (isShowing && (cls === 'Accidental Industrial Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire')) {
+    if (isShowing && (cls === 'Accidental Industrial Fire' || cls === 'Urban/Residential Fire' || cls === 'Gas Leakage (Chemical)' || cls === 'Wildfire')) {
         let radiusKm = Math.max(parseFloat(frp) * 0.08, 1.5);
         if (cls === 'Gas Leakage (Chemical)') radiusKm = Math.max(radiusKm, 2.0);
         let radiusMeters = radiusKm * 1000;
