@@ -34,10 +34,10 @@ const satelliteLayer = L.tileLayer(
     { attribution: 'Tiles &copy; Esri', noWrap: true }
 ).addTo(map);
 
-// Light map overlay for hybrid view (contains crisp clean map text/labels)
-const lightOverlay = L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
-    { attribution: '&copy; CartoDB', opacity: 0.8, noWrap: true }
+// Dark map overlay for hybrid view (contains the map text/labels)
+const darkOverlay = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; CartoDB', opacity: 0.6, noWrap: true }
 ).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -382,7 +382,7 @@ function buildPopupHTML(feature) {
                             ">
                         🚨 View Tactical Evacuation Protocol
                     </button>
-                    <div style="display:none; background:#f1f5f9; border:1px solid #e2e8f0; padding:6px 8px; border-radius:4px; margin-top:4px; font-size:0.7rem; color:#334155;">
+                    <div style="display:none; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:4px; margin-top:4px; font-size:0.7rem; color:#cbd5e1;">
                         <ul style="margin:0; padding-left:14px; line-height:1.4;">
                             ${cls === 'Industrial Fire' ? `
                                 <li>Establish minimum containment exclusion zone</li>
@@ -497,11 +497,7 @@ function updateAnalyticsChart(counts) {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                        titleColor: '#0f172a',
-                        bodyColor: '#334155',
-                        borderColor: '#e2e8f0',
-                        borderWidth: 1,
+                        backgroundColor: 'rgba(15,15,20,0.9)',
                         titleFont: { family: 'Outfit', size: 13 },
                         bodyFont: { family: 'Outfit', size: 13 },
                         padding: 10,
@@ -741,24 +737,24 @@ function loadData() {
                         
                         const terrain = p.satellite_terrain || 'Unknown';
                         let terrainIcon = '🛰️';
-                        let terrainCol = '#0284c7';
-                        let terrainBg = 'rgba(2, 132, 199, 0.12)';
+                        let terrainCol = '#38bdf8';
+                        let terrainBg = 'rgba(56, 189, 248, 0.15)';
                         if (terrain.includes('Industry')) {
                             terrainIcon = '🏭';
-                            terrainCol = '#dc2626';
-                            terrainBg = 'rgba(220, 38, 38, 0.12)';
+                            terrainCol = '#f87171';
+                            terrainBg = 'rgba(239, 68, 68, 0.2)';
                         } else if (terrain.includes('Forest')) {
                             terrainIcon = '🌲';
-                            terrainCol = '#059669';
-                            terrainBg = 'rgba(5, 150, 105, 0.12)';
+                            terrainCol = '#34d399';
+                            terrainBg = 'rgba(16, 185, 129, 0.2)';
                         } else if (terrain.includes('Agricultural')) {
                             terrainIcon = '🌾';
-                            terrainCol = '#d97706';
-                            terrainBg = 'rgba(217, 119, 6, 0.12)';
+                            terrainCol = '#fde047';
+                            terrainBg = 'rgba(250, 204, 21, 0.2)';
                         } else if (terrain.includes('Water')) {
                             terrainIcon = '⚓';
-                            terrainCol = '#0284c7';
-                            terrainBg = 'rgba(2, 132, 199, 0.12)';
+                            terrainCol = '#38bdf8';
+                            terrainBg = 'rgba(14, 165, 233, 0.2)';
                         }
                         
                         feedHTML += `
@@ -944,10 +940,10 @@ function loadFireHistoryChart() {
                             label: 'Mean FRP (MW)',
                             data: frpData,
                             type: 'line',
-                            borderColor: '#0284c7',
-                            backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
                             borderWidth: 2.5,
-                            pointBackgroundColor: '#0284c7',
+                            pointBackgroundColor: '#38bdf8',
                             pointRadius: 3.5,
                             tension: 0.35,
                             yAxisID: 'yFrp',
@@ -965,37 +961,35 @@ function loadFireHistoryChart() {
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                            titleColor: '#0f172a',
-                            bodyColor: '#334155',
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
                             titleFont: { family: 'Outfit', size: 13, weight: 'bold' },
                             bodyFont: { family: 'Outfit', size: 12 },
                             padding: 10,
                             cornerRadius: 8,
-                            borderColor: '#e2e8f0',
+                            borderColor: 'rgba(255, 255, 255, 0.12)',
                             borderWidth: 1
                         }
                     },
                     scales: {
                         x: {
-                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                            ticks: { color: '#64748b', font: { family: 'Outfit', size: 11 } }
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } }
                         },
                         y: {
                             stacked: true,
-                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                            ticks: { color: '#64748b', font: { family: 'Outfit', size: 11 } },
-                            title: { display: true, text: 'Fires Detected', color: '#64748b', font: { size: 10, family: 'Outfit' } }
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } },
+                            title: { display: true, text: 'Fires Detected', color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
                         },
                         yFrp: {
                             position: 'right',
                             grid: { drawOnChartArea: false },
                             ticks: {
-                                color: '#0284c7',
+                                color: '#38bdf8',
                                 font: { family: 'Outfit', size: 11 },
                                 callback: v => v + ' MW'
                             },
-                            title: { display: true, text: 'Avg Radiative Power', color: '#0284c7', font: { size: 10, family: 'Outfit' } }
+                            title: { display: true, text: 'Avg Radiative Power', color: '#38bdf8', font: { size: 10, family: 'Outfit' } }
                         }
                     }
                 }
@@ -1052,11 +1046,11 @@ function loadActiveFireZones() {
                             </div>
                         </div>
                         <div class="zone-metrics-row">
-                            <span>Total: <strong style="color:#0f172a;">${z.total_fires}</strong></span>
-                            ${z.industrial_fires > 0 ? `<span style="color:#dc2626; font-weight:600;">● ${z.industrial_fires} Industrial</span>` : ''}
-                            ${z.forest_fires > 0 ? `<span style="color:#ea580c; font-weight:600;">● ${z.forest_fires} Forest</span>` : ''}
-                            ${z.agri_fires > 0 ? `<span style="color:#d97706; font-weight:600;">● ${z.agri_fires} Agri</span>` : ''}
-                            <span>Peak: <strong style="color:#0284c7;">${z.max_frp} MW</strong></span>
+                            <span>Total: <strong style="color:#f8fafc;">${z.total_fires}</strong></span>
+                            ${z.industrial_fires > 0 ? `<span style="color:#ef4444; font-weight:600;">● ${z.industrial_fires} Industrial</span>` : ''}
+                            ${z.forest_fires > 0 ? `<span style="color:#f97316;">● ${z.forest_fires} Forest</span>` : ''}
+                            ${z.agri_fires > 0 ? `<span style="color:#facc15;">● ${z.agri_fires} Agri</span>` : ''}
+                            <span>Peak: <strong style="color:#38bdf8;">${z.max_frp} MW</strong></span>
                         </div>
                     </div>
                     <button class="zone-focus-btn" onclick="event.stopPropagation(); window.focusFireZone(${z.center_lat}, ${z.center_lon});">

@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style_v8.css?v=35">
+    <link rel="stylesheet" href="style_v8.css?v=36">
 </head>
 <body>
 
-    <!-- Gradient Background overlays (Soft ambient light tints) -->
+    <!-- Gradient Background overlays -->
     <div class="bg-gradient-1"></div>
     <div class="bg-gradient-2"></div>
 
@@ -30,40 +30,40 @@
         display: none;
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(10px);
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(12px);
         z-index: 10000;
         justify-content: center;
         align-items: center;
         font-family: 'Outfit', sans-serif;
     ">
         <div style="
-            background: #ffffff;
-            border: 1px solid rgba(220, 38, 38, 0.3);
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border: 1px solid rgba(220, 38, 38, 0.4);
             border-radius: 16px;
             padding: 32px;
             max-width: 420px;
             text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 30px rgba(220, 38, 38, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(220, 38, 38, 0.2);
             position: relative;
         ">
             <div style="
                 width: 64px; height: 64px;
-                background: rgba(220, 38, 38, 0.1);
+                background: rgba(220, 38, 38, 0.15);
                 border-radius: 50%;
                 display: flex; justify-content: center; align-items: center;
                 margin: 0 auto 20px auto;
-                box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
+                box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
                 animation: alertPulse 2s infinite alternate;
             ">
                 <span style="font-size: 32px;">🚨</span>
             </div>
-            <h2 style="color: #dc2626; margin: 0 0 12px 0; font-weight: 700;">Active Fire Detected</h2>
-            <p style="color: #475569; font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px;" id="initial-fire-popup-text">
+            <h2 style="color: #ef4444; margin: 0 0 12px 0; font-weight: 700;">Active Fire Detected</h2>
+            <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px;" id="initial-fire-popup-text">
                 Critical Industrial Fires or Wildfires have been detected in the monitored region. Immediate attention is required.
             </p>
             <button onclick="document.getElementById('initial-fire-popup').style.display='none';" style="
-                background: #dc2626;
+                background: #ef4444;
                 color: #ffffff;
                 border: none;
                 padding: 12px 24px;
@@ -74,7 +74,7 @@
                 cursor: pointer;
                 width: 100%;
                 transition: background 0.2s;
-            " onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
                 Acknowledge & View Dashboard
             </button>
         </div>
@@ -98,8 +98,8 @@
         font-size: 0.85rem;
         color: #fff;
         letter-spacing: 0.5px;
-        box-shadow: 0 10px 25px rgba(220,38,38,0.3);
-        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 10px 25px rgba(220,38,38,0.4);
+        border: 1px solid rgba(255,255,255,0.2);
         animation: alertPulse 2s infinite alternate;
     ">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -160,14 +160,14 @@
 
                 <div class="stat-card">
                     <span class="stat-label">Agricultural Burn</span>
-                    <h2 class="stat-value text-agri" id="agri-count" style="color: #d97706;">--</h2>
-                    <div class="stat-sparkline" style="background: linear-gradient(90deg, #d97706, transparent);"></div>
+                    <h2 class="stat-value text-agri" id="agri-count" style="color: #facc15;">--</h2>
+                    <div class="stat-sparkline" style="background: linear-gradient(90deg, #facc15, transparent);"></div>
                 </div>
 
                 <div class="stat-card">
                     <span class="stat-label">Persistent Industrial Thermal Source</span>
-                    <h2 class="stat-value text-routine-heat" id="persistent-count" style="color: #059669;">--</h2>
-                    <div class="stat-sparkline green-glow"></div>
+                    <h2 class="stat-value text-routine-heat" id="persistent-count" style="color: #8b5cf6;">--</h2>
+                    <div class="stat-sparkline" style="background: linear-gradient(90deg, #8b5cf6, transparent);"></div>
                 </div>
             </section>
             
@@ -191,7 +191,7 @@
                         <span class="legend-text">Forest Fire</span>
                     </li>
                     <li>
-                        <div class="legend-marker" style="background: #d97706; box-shadow: 0 0 10px rgba(217,119,6,0.5);"></div>
+                        <div class="legend-marker" style="background: #facc15; box-shadow: 0 0 10px #facc15;"></div>
                         <span class="legend-text">Agricultural Burn</span>
                     </li>
                     <li>
@@ -220,7 +220,7 @@
                 <!-- Floating Top Bar overlay on map -->
                 <div class="floating-header glass-panel">
                     <div class="location-info">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                         <span>SIH26162 · Real-Time Satellite AI</span>
                     </div>
                     <div class="time-info">
@@ -229,8 +229,8 @@
                 </div>
 
                 <!-- Button to open right panel -->
-                <button id="open-panel-btn" class="glass-panel" style="display: block; position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 8px 16px; border: 1px solid rgba(226, 232, 240, 0.9); cursor: pointer; color: #0f172a; font-weight: 600; font-family: 'Outfit', sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 20px; box-shadow: 0 4px 15px rgba(15,23,42,0.08);" onclick="toggleRightPanel()">
-                    <span style="color:#dc2626; margin-right: 6px;">●</span> Live Alerts
+                <button id="open-panel-btn" class="glass-panel" style="display: block; position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 8px 16px; border: none; cursor: pointer; color: white; font-weight: 500; font-family: 'Outfit', sans-serif;" onclick="toggleRightPanel()">
+                    <span style="color:#ef4444; margin-right: 6px;">●</span> Live Alerts
                 </button>
 
                 <!-- Mobile Analytics Toggle -->
@@ -290,48 +290,48 @@
                         <span class="zones-count-pill" id="active-zones-badge">8 Monitored Hubs</span>
                     </div>
                     <div class="zones-list-container" id="active-zones-list">
-                        <div style="color:#64748b; font-size:0.8rem; text-align:center; padding:20px;">Analyzing global fire clusters...</div>
+                        <div style="color:#94a3b8; font-size:0.8rem; text-align:center; padding:20px;">Analyzing global fire clusters...</div>
                     </div>
                 </div>
             </section>
         </div>
         
         <!-- Right Action Panel: Incident Feed -->
-        <aside id="right-panel" class="right-panel glass-panel" style="width: 320px; display: none; flex-direction: column; border-left: 1px solid rgba(226,232,240,0.9); padding: 20px; position: relative; transition: margin 0.3s ease, opacity 0.3s ease; background: rgba(255, 255, 255, 0.94);">
+        <aside id="right-panel" class="right-panel glass-panel" style="width: 320px; display: none; flex-direction: column; border-left: 1px solid rgba(255,255,255,0.05); padding: 20px; position: relative; transition: margin 0.3s ease, opacity 0.3s ease;">
             <!-- Close Button -->
-            <button onclick="toggleRightPanel()" style="position: absolute; top: 12px; right: 12px; background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'">
+            <button onclick="toggleRightPanel()" style="position: absolute; top: 12px; right: 12px; background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
                 ✕
             </button>
             <!-- Baseline Reference Card -->
-            <div id="baseline-reference-card" style="margin-bottom: 15px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <h4 style="font-size: 0.8rem; color: #0284c7; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">🛰️ Vision + Thermal AI Segregation</h4>
-                <ul style="list-style: none; padding: 0; font-size: 0.75rem; color: #475569; display: flex; flex-direction: column; gap: 6px;">
+            <div id="baseline-reference-card" style="margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+                <h4 style="font-size: 0.8rem; color: #38bdf8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">🛰️ Vision + Thermal AI Segregation</h4>
+                <ul style="list-style: none; padding: 0; font-size: 0.75rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 6px;">
                     <li style="display: flex; justify-content: space-between;">
-                        <span><span style="color:#dc2626;">●</span> Industrial Fire (Inferno):</span>
-                        <span style="font-family: monospace; font-weight: 600;">🏭 Factory + >35MW</span>
+                        <span><span style="color:#ef4444;">●</span> Industrial Fire (Inferno):</span>
+                        <span style="font-family: monospace;">🏭 Factory + >35MW</span>
                     </li>
                     <li style="display: flex; justify-content: space-between;">
-                        <span><span style="color:#ea580c;">●</span> Forest Fire (Wildfire):</span>
-                        <span style="font-family: monospace; font-weight: 600;">🌲 Canopy + Flame</span>
+                        <span><span style="color:#f97316;">●</span> Forest Fire (Wildfire):</span>
+                        <span style="font-family: monospace;">🌲 Canopy + Flame</span>
                     </li>
                     <li style="display: flex; justify-content: space-between;">
-                        <span><span style="color:#d97706;">●</span> Agricultural Burn:</span>
-                        <span style="font-family: monospace; font-weight: 600;">🌾 Farmland Crop</span>
+                        <span><span style="color:#facc15;">●</span> Agricultural Burn:</span>
+                        <span style="font-family: monospace;">🌾 Farmland Crop</span>
                     </li>
                     <li style="display: flex; justify-content: space-between;">
-                        <span><span style="color:#059669;">●</span> Persistent Thermal Source:</span>
-                        <span style="font-family: monospace; font-weight: 600;">⚓ Rig / Flare / Stack</span>
+                        <span><span style="color:#10b981;">●</span> Persistent Thermal Source:</span>
+                        <span style="font-family: monospace;">⚓ Rig / Flare / Stack</span>
                     </li>
                 </ul>
             </div>
 
-            <h3 style="font-size: 1.1rem; font-weight: 600; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-                <div class="live-indicator" style="width:8px; height:8px; background:#dc2626; border-radius:50%; box-shadow: 0 0 10px rgba(220,38,38,0.5); animation: pulse 2s infinite;"></div>
+            <h3 style="font-size: 1.1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                <div class="live-indicator" style="width:8px; height:8px; background:#ef4444; border-radius:50%; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite;"></div>
                 Live Incident Feed
             </h3>
             
             <div id="incident-feed-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 5px;">
-                <div style="color: #64748b; font-size: 0.85rem; font-style: italic;">Awaiting pipeline data...</div>
+                <div style="color: #94a3b8; font-size: 0.85rem; font-style: italic;">Awaiting pipeline data...</div>
             </div>
         </aside>
 
@@ -342,27 +342,25 @@
                 100% { opacity: 1; }
             }
             .feed-item {
-                background: #ffffff;
-                border: 1px solid #e2e8f0;
+                background: rgba(15, 23, 42, 0.6);
+                border: 1px solid rgba(255,255,255,0.05);
                 border-radius: 8px;
                 padding: 12px;
                 cursor: pointer;
                 transition: all 0.2s ease;
                 font-family: 'Outfit', sans-serif;
-                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
             }
             .feed-item:hover {
-                background: #f8fafc;
-                border-color: #cbd5e1;
+                background: rgba(30, 41, 59, 0.8);
+                border-color: rgba(255,255,255,0.15);
                 transform: translateY(-2px);
-                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
             }
             .feed-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
-            .feed-meta { font-size: 0.75rem; color: #64748b; display: flex; justify-content: space-between; }
+            .feed-meta { font-size: 0.75rem; color: #94a3b8; display: flex; justify-content: space-between; }
             
             /* Custom scrollbar for feed */
             #incident-feed-container::-webkit-scrollbar { width: 4px; }
-            #incident-feed-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+            #incident-feed-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
         </style>
         
     </div>
@@ -374,6 +372,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom JS -->
-    <script src="app_v8.js?v=35"></script>
+    <script src="app_v8.js?v=36"></script>
 </body>
 </html>
