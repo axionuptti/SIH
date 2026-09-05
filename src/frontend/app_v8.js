@@ -23,8 +23,10 @@ const map = L.map('map', {
     maxBounds: worldBounds, // Restrict panning to a single Earth
     maxBoundsViscosity: 0.8, // Smooth bounds
     zoomSnap: 1, // Snaps to integer zoom levels to eliminate fractional sub-pixel tile misalignment
-    zoomDelta: 1
+    zoomDelta: 1,
+    closePopupOnClick: false // Prevents clicks on map from closing popups!
 }).setView([20.0, 0.0], 2);
+map.options.closePopupOnClick = false;
 
 // Satellite base layer
 const satelliteLayer = L.tileLayer(
@@ -147,6 +149,18 @@ function formatAcqTime(timeStr) {
 map.on('popupopen', function(e) {
     const popupContent = e.popup.getElement();
     if (!popupContent) return;
+    
+    // Prevent any clicks or scroll events inside the popup from bubbling to the map
+    L.DomEvent.disableClickPropagation(popupContent);
+    L.DomEvent.disableScrollPropagation(popupContent);
+    
+    // Native DOM event interception for all pointer/mouse/touch events
+    ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend'].forEach(evtType => {
+        popupContent.addEventListener(evtType, function(ev) {
+            ev.stopPropagation();
+            if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        }, { passive: false });
+    });
     
     const addressSpan = popupContent.querySelector('.address-loader');
     if (addressSpan && !addressSpan.dataset.loaded) {
@@ -326,7 +340,10 @@ function buildPopupHTML(feature) {
             </div>
 
             <!-- 4. ℹ️ MORE INFO BUTTON -->
-            <button class="more-info-toggle-btn" onclick="window.toggleHotspotPalette(this, event)">
+            <button class="more-info-toggle-btn" 
+                    onmousedown="if(event.stopPropagation)event.stopPropagation();" 
+                    onpointerdown="if(event.stopPropagation)event.stopPropagation();" 
+                    onclick="window.toggleHotspotPalette(this, event)">
                 <span class="btn-text">ℹ️ More Info & Satellite Telemetry</span>
                 <span class="chevron">▼</span>
             </button>
@@ -413,7 +430,10 @@ function buildPopupHTML(feature) {
                 ` : ''}
 
                 <!-- Dedicated Close Details Button at Bottom -->
-                <button class="close-palette-btn" onclick="window.closeHotspotPalette(this, event)">
+                <button class="close-palette-btn" 
+                        onmousedown="if(event.stopPropagation)event.stopPropagation();" 
+                        onpointerdown="if(event.stopPropagation)event.stopPropagation();" 
+                        onclick="window.closeHotspotPalette(this, event)">
                     <span>✖ Close Details Palette</span>
                 </button>
             </div>
@@ -423,9 +443,15 @@ function buildPopupHTML(feature) {
 window.toggleHotspotPalette = function(btn, event) {
     if (event) {
         event.stopPropagation();
-        event.preventDefault();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        if (event.preventDefault) event.preventDefault();
     }
-    const palette = btn.nextElementSibling;
+    if (window.L && L.DomEvent && event) {
+        L.DomEvent.stopPropagation(event);
+    }
+    const card = btn.closest('.spot-popup-card');
+    if (!card) return;
+    const palette = card.querySelector('.expanded-info-palette');
     if (!palette) return;
     const isHidden = palette.style.display === 'none';
     palette.style.display = isHidden ? 'block' : 'none';
@@ -441,23 +467,30 @@ window.toggleHotspotPalette = function(btn, event) {
     if (chevron) chevron.innerText = isHidden ? '▲' : '▼';
     if (textEl) textEl.innerText = isHidden ? '✖ Close Details Palette' : 'ℹ️ More Info & Satellite Telemetry';
     
-    // Auto-refresh Leaflet popup bounds smoothly and pan up slightly so content is visible
-    if (map && map._popup) {
-        setTimeout(() => {
-            map._popup.update();
-            if (isHidden) {
-                const px = map.project(map._popup.getLatLng());
-                px.y -= 60;
-                map.panTo(map.unproject(px), { animate: true, duration: 0.25 });
+    // Smoothly update popup layout without closing it or triggering jumpy map animations
+    setTimeout(() => {
+        if (map) {
+            map.eachLayer(l => {
+                if (l.getPopup && l.isPopupOpen && l.isPopupOpen()) {
+                    const pop = l.getPopup();
+                    if (pop && pop.update) pop.update();
+                }
+            });
+            if (map._popup && map._popup.update) {
+                map._popup.update();
             }
-        }, 40);
-    }
+        }
+    }, 20);
 };
 
 window.closeHotspotPalette = function(btn, event) {
     if (event) {
         event.stopPropagation();
-        event.preventDefault();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        if (event.preventDefault) event.preventDefault();
+    }
+    if (window.L && L.DomEvent && event) {
+        L.DomEvent.stopPropagation(event);
     }
     const card = btn.closest('.spot-popup-card');
     if (!card) return;
@@ -471,9 +504,19 @@ window.closeHotspotPalette = function(btn, event) {
         if (chevron) chevron.innerText = '▼';
         if (textEl) textEl.innerText = 'ℹ️ More Info & Satellite Telemetry';
     }
-    if (map && map._popup) {
-        setTimeout(() => map._popup.update(), 30);
-    }
+    setTimeout(() => {
+        if (map) {
+            map.eachLayer(l => {
+                if (l.getPopup && l.isPopupOpen && l.isPopupOpen()) {
+                    const pop = l.getPopup();
+                    if (pop && pop.update) pop.update();
+                }
+            });
+            if (map._popup && map._popup.update) {
+                map._popup.update();
+            }
+        }
+    }, 20);
 };
 
 // ─── Main Data Loader ─────────────────────────────────────────────────────────
@@ -579,7 +622,7 @@ function loadData() {
             
             // If user currently has an open popup on the map (e.g. reading details),
             // do NOT wipe the map layers so the details palette stays open and stable!
-            const isUserInspecting = (map && map._popup && map.hasLayer(map._popup));
+            const isUserInspecting = (document.querySelector('.leaflet-popup') !== null);
             if (isUserInspecting) {
                 // Update stats and incident feed, but don't disrupt the active inspection popup
                 updateAnalyticsChart(counts);
@@ -596,13 +639,12 @@ function loadData() {
             clearHotspotLayers();
 
             const popupConfig = {
-                maxWidth: 330,
+                maxWidth: 340,
                 minWidth: 280,
                 closeOnClick: false,    // Keeps details palette open when clicking or dragging the map!
-                autoClose: true,        // Switches cleanly if user clicks a different fire spot
+                autoClose: false,       // NEVER closes automatically - stays open till user closes it!
                 closeButton: true,      // User explicitly closes via 'X' or 'Close Details Palette'
-                autoPan: true,
-                autoPanPadding: [25, 25]
+                autoPan: false          // Prevents abrupt autoPan jumps from interfering with open popup!
             };
 
             L.geoJSON(data, {
@@ -652,17 +694,18 @@ function loadData() {
                         fillOpacity: isCritical ? 0.9 : 0.7,
                     });
 
-                    layer.bindPopup(buildPopupHTML(feature), popupConfig);
                     circle.bindPopup(buildPopupHTML(feature), popupConfig);
 
-                    const dualLayer = L.featureGroup();
-                    dualLayer._polygon = layer;
-                    dualLayer._circle = circle;
-                    
-                    window.hotspotDualLayers.push(dualLayer);
+                    // Ensure marker click always opens popup and NEVER toggles it closed
+                    circle.on('click', function(e) {
+                        if (e && e.originalEvent) {
+                            L.DomEvent.stopPropagation(e.originalEvent);
+                        }
+                        circle.openPopup();
+                    });
 
                     if (layerGroups[cls]) {
-                        layerGroups[cls].addLayer(dualLayer);
+                        layerGroups[cls].addLayer(circle);
                     }
                 }
             });
@@ -698,13 +741,11 @@ function loadData() {
             if (document.getElementById('agri-count')) animateValue('agri-count', 0, counts.agri, 1200);
             if (document.getElementById('forest-fire-count')) animateValue('forest-fire-count', 0, counts.forest, 1200);
 
-            // Trigger Siren Popup whenever a NEW critical fire appears
+            // Trigger Siren Popup only when NEW critical fires appear after initial scan
             const currentCriticalCount = counts.industrial + counts.forest;
             if (window.lastCriticalCount === undefined) {
-                window.lastCriticalCount = 0;
-            }
-            
-            if (currentCriticalCount > window.lastCriticalCount) {
+                window.lastCriticalCount = currentCriticalCount;
+            } else if (currentCriticalCount > window.lastCriticalCount) {
                 const sirenPopup = document.getElementById('initial-fire-popup');
                 if (sirenPopup) {
                     sirenPopup.style.display = 'flex';
@@ -713,8 +754,8 @@ function loadData() {
                         textEl.innerHTML = `<strong>🚨 SIREN ALERT:</strong> ${currentCriticalCount - window.lastCriticalCount} NEW critical hazard(s) detected since last scan! Immediate attention required.`;
                     }
                 }
+                window.lastCriticalCount = currentCriticalCount;
             }
-            window.lastCriticalCount = currentCriticalCount;
 
             // Update critical alert banner
             const alertEl = document.getElementById('critical-alert');
@@ -842,16 +883,7 @@ function updateAcquisitionTime(features) {
 // ─── Zoom Rendering Engine ────────────────────────────────────────────────────
 window.hotspotDualLayers = [];
 window.updateHotspotVisibility = function() {
-    const isZoomedIn = map.getZoom() >= 13;
-    window.hotspotDualLayers.forEach(dl => {
-        if (isZoomedIn) {
-            if (dl.hasLayer(dl._circle)) dl.removeLayer(dl._circle);
-            if (!dl.hasLayer(dl._polygon)) dl.addLayer(dl._polygon);
-        } else {
-            if (dl.hasLayer(dl._polygon)) dl.removeLayer(dl._polygon);
-            if (!dl.hasLayer(dl._circle)) dl.addLayer(dl._circle);
-        }
-    });
+    // Markers stay persistent across all zoom levels so popups NEVER close on zoom!
 };
 map.on('zoomend', window.updateHotspotVisibility);
 
