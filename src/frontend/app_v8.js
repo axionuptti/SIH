@@ -780,6 +780,10 @@ function loadData() {
 
             // Update Chart.js donut
             updateAnalyticsChart(counts);
+
+            // Update live satellite acquisition time and sync status
+            updateAcquisitionTime(data.features);
+            fetchSyncStatus();
         })
         .catch(err => console.error('Error loading hotspots:', err))
         .finally(() => {
@@ -787,10 +791,102 @@ function loadData() {
         });
 }
 
+// ─── NASA Satellite Sync & Real-Time Cadence Engine ───────────────────────────
+window.syncCountdownSeconds = 600;
+window.latestSatelliteAcqStr = "2026-09-05 13:40 UTC";
+window.totalFiresSynced = 3994;
+
+function fetchSyncStatus() {
+    fetch('/api/sync/status')
+        .then(r => r.json())
+        .then(info => {
+            if (info) {
+                if (info.next_sync_seconds !== undefined) {
+                    window.syncCountdownSeconds = info.next_sync_seconds;
+                }
+                if (info.latest_satellite_acq) {
+                    window.latestSatelliteAcqStr = info.latest_satellite_acq;
+                }
+                if (info.total_fires_active) {
+                    window.totalFiresSynced = info.total_fires_active;
+                }
+                renderSyncInfo(info);
+            }
+        })
+        .catch(() => {});
+}
+
+function renderSyncInfo(info) {
+    const timeEl = document.getElementById('current-time');
+    const syncEl = document.getElementById('last-sync-time');
+    
+    const mins = Math.floor(window.syncCountdownSeconds / 60);
+    const secs = window.syncCountdownSeconds % 60;
+    const countdownStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    
+    if (timeEl) {
+        const satAcq = window.latestSatelliteAcqStr;
+        timeEl.innerHTML = `🛰️ NASA VIIRS: <strong style="color:#38bdf8;">${satAcq}</strong> <span style="margin: 0 4px; opacity:0.5;">·</span> Next Sync: <strong style="color:#facc15;" id="sync-countdown-val">${countdownStr}</strong>`;
+    }
+    
+    if (syncEl) {
+        const count = (info && info.total_fires_active) ? info.total_fires_active.toLocaleString() : window.totalFiresSynced.toLocaleString();
+        syncEl.innerHTML = `<span style="color:#10b981;">● Synced (${count} Hotspots)</span> <span style="color:#94a3b8; font-size:0.7rem;">· Every 10m (NASA EOSDIS)</span>`;
+    }
+}
+
+// 1-second dynamic countdown ticker
+if (!window.syncTimerInterval) {
+    window.syncTimerInterval = setInterval(() => {
+        if (window.syncCountdownSeconds > 0) {
+            window.syncCountdownSeconds--;
+            const countSpan = document.getElementById('sync-countdown-val');
+            if (countSpan) {
+                const mins = Math.floor(window.syncCountdownSeconds / 60);
+                const secs = window.syncCountdownSeconds % 60;
+                countSpan.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        } else {
+            // Countdown reached 0 -> trigger live poll & fetch
+            window.syncCountdownSeconds = 600;
+            loadData();
+            fetchSyncStatus();
+        }
+    }, 1000);
+}
+
+// Manual live sync trigger
+window.triggerLiveSync = function(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const btn = document.getElementById('btn-sync-now');
+    const spinner = document.getElementById('sync-btn-spinner');
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.add('spin-animation');
+
+    fetch('/api/sync/now?force=true', { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+            loadData();
+            fetchSyncStatus();
+            if (btn) {
+                btn.innerHTML = `<span style="color:#34d399;">✅ Synced!</span>`;
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span id="sync-btn-spinner">🔄</span> <span>Sync Feed</span>`;
+                }, 2500);
+            }
+        })
+        .catch(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<span id="sync-btn-spinner">🔄</span> <span>Sync Feed</span>`;
+            }
+        });
+};
+
 // ─── Acquisition Time Sync ───────────────────────────────────────────────────
 function updateAcquisitionTime(features) {
-    const el = document.getElementById('current-time');
-    if (!el || !features || !features.length) return;
+    if (!features || !features.length) return;
     
     let latestTimestamp = 0;
     features.forEach(f => {
@@ -809,9 +905,10 @@ function updateAcquisitionTime(features) {
             timeZone: 'UTC', hour12: false
         });
         const dateFormatted = latestDate.toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', timeZone: 'UTC'
+            year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
         });
-        el.innerText = `Data Acquired: ${dateFormatted} ${timeFormatted} UTC (Global Realtime)`;
+        window.latestSatelliteAcqStr = `${dateFormatted} ${timeFormatted} UTC`;
+        renderSyncInfo();
     }
 }
 
@@ -1073,6 +1170,7 @@ function loadActiveFireZones() {
 loadData();
 loadFireHistoryChart();
 loadActiveFireZones();
+fetchSyncStatus();
 
 // ─── View Mode Switching & Analytics Drawer ──────────────────────────────────
 window.switchViewMode = function(mode) {

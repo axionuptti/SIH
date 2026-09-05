@@ -18,28 +18,35 @@ app = FastAPI(
 
 import sys
 
+from src.api.live_sync import sync_manager
+
 @app.on_event("startup")
 async def startup_event():
     async def sync_loop():
+        # Immediate sync on startup if needed
+        try:
+            sync_manager.sync_from_firms(force=False)
+            data = load_geojson("data/processed/classified_hotspots.geojson")
+            if data:
+                from src.api.alerts import check_and_send_alerts
+                check_and_send_alerts(data)
+        except Exception as e:
+            print(f"Startup satellite sync error: {e}")
+
         while True:
+            # NASA FIRMS satellites (VIIRS Suomi-NPP & NOAA-20) downlink NRT orbits every 10-15 mins.
+            # 600 seconds (10 minutes) complies with NASA's 10-minute rate limit policy window
+            # while capturing every new Near-Real-Time orbital fire pass.
+            await asyncio.sleep(600)
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    sys.executable, "run_pipeline.py", "--skip-osm", "--skip-train", 
-                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-                )
-                await proc.wait()
-                
-                # Check for new critical fires and dispatch Telegram alerts
+                sync_manager.sync_from_firms(force=False)
                 data = load_geojson("data/processed/classified_hotspots.geojson")
                 if data:
                     from src.api.alerts import check_and_send_alerts
                     check_and_send_alerts(data)
             except Exception as e:
-                print(f"Pipeline sync error: {e}")
+                print(f"Periodic live sync error: {e}")
                 
-            # Wait 10 minutes (600s) before fetching the next satellite overpass
-            await asyncio.sleep(600)
-            
     asyncio.create_task(sync_loop())
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -126,8 +133,24 @@ def get_stats():
     return {
         "total": len(features),
         "by_class": counts,
-        "avg_confidence": round(sum(confidences) / len(confidences), 1) if confidences else None
+        "avg_confidence": round(sum(confidences) / len(confidences), 1) if confidences else None,
+        "sync": sync_manager.get_status()
     }
+
+
+# ─── Live Feed Sync Endpoints ─────────────────────────────────────────────────
+
+@app.get("/api/sync/status", tags=["Sync"])
+def get_sync_status():
+    """Returns NASA FIRMS NRT live synchronization state, countdown, and satellite timestamps."""
+    return sync_manager.get_status()
+
+
+@app.post("/api/sync/now", tags=["Sync"])
+def trigger_sync_now(force: bool = False):
+    """Triggers an on-demand satellite feed synchronization from NASA FIRMS API."""
+    result = sync_manager.sync_from_firms(force=force)
+    return result
 
 
 # ─── Analytical Deck Endpoints ────────────────────────────────────────────────

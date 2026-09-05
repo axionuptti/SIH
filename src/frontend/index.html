@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style_v8.css?v=39">
+    <link rel="stylesheet" href="style_v8.css?v=40">
 </head>
 <body>
 
@@ -205,8 +205,8 @@
                     <p><strong>Data:</strong> NASA FIRMS Real-Time Global Satellite Feed</p>
                     <p><strong>Sensors:</strong> Suomi-NPP & NOAA-20 VIIRS (375m)</p>
                     <p><strong>Filter:</strong> Severe & Heavy Fires (FRP ≥ 25.0 MW)</p>
-                    <p><strong>Coverage:</strong> Worldwide Global Active Scan</p>
-                    <p><strong>Last Sync:</strong> <span id="last-sync-time">Fetching...</span></p>
+                    <p><strong>Sync Policy:</strong> NASA EOSDIS (10-min rate limit window)</p>
+                    <p><strong>Satellite Feed:</strong> <span id="last-sync-time">Connecting...</span></p>
                 </div>
             </footer>
         </aside>
@@ -245,6 +245,11 @@
                     <!-- Expand / Full Frame Map Button -->
                     <button class="mode-pill-btn" onclick="window.toggleFullScreen()" title="Expand Map across the entire window frame">
                         <span id="expand-btn-icon">⛶ Expand</span>
+                    </button>
+
+                    <!-- Live Satellite Sync Button -->
+                    <button id="btn-sync-now" class="mode-pill-btn" onclick="window.triggerLiveSync(event)" title="Sync latest satellite overpass from NASA FIRMS API (10-min rate-limited)">
+                        <span id="sync-btn-spinner">🔄</span> <span>Sync Feed</span>
                     </button>
                 </div>
 
@@ -414,6 +419,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom JS -->
-    <script src="app_v8.js?v=39"></script>
+    <script src="app_v8.js?v=40"></script>
 </body>
 </html>

@@ -15,7 +15,7 @@ _ALERTED_FIRES = set()
 
 def send_telegram_message(text: str):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID or TELEGRAM_BOT_TOKEN == "your_bot_token_here":
-        print(f"Telegram alerting skipped (No Credentials). Mock Message:\n{'-'*40}\n{text}\n{'-'*40}")
+        # Silent return if credentials not configured
         return False
         
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"

@@ -992,6 +992,16 @@ body {
     border: 1px solid rgba(56, 189, 248, 0.4);
 }
 
+@keyframes spinClockwise {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin-animation {
+    display: inline-block;
+    animation: spinClockwise 0.8s linear infinite;
+}
+
 /* Bottom Floating Dock on Map */
 .map-bottom-dock {
     position: absolute;
