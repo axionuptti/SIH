@@ -326,7 +326,7 @@ function buildPopupHTML(feature) {
             </div>
 
             <!-- 4. ℹ️ MORE INFO BUTTON -->
-            <button class="more-info-toggle-btn" onclick="window.toggleHotspotPalette(this)">
+            <button class="more-info-toggle-btn" onclick="window.toggleHotspotPalette(this, event)">
                 <span class="btn-text">ℹ️ More Info & Satellite Telemetry</span>
                 <span class="chevron">▼</span>
             </button>
@@ -411,21 +411,66 @@ function buildPopupHTML(feature) {
                     </div>
                 </div>
                 ` : ''}
+
+                <!-- Dedicated Close Details Button at Bottom -->
+                <button class="close-palette-btn" onclick="window.closeHotspotPalette(this, event)">
+                    <span>✖ Close Details Palette</span>
+                </button>
             </div>
         </div>`;
 }
 
-window.toggleHotspotPalette = function(btn) {
+window.toggleHotspotPalette = function(btn, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     const palette = btn.nextElementSibling;
     if (!palette) return;
     const isHidden = palette.style.display === 'none';
     palette.style.display = isHidden ? 'block' : 'none';
+    
+    if (isHidden) {
+        btn.classList.add('active-open');
+    } else {
+        btn.classList.remove('active-open');
+    }
+    
     const chevron = btn.querySelector('.chevron');
     const textEl = btn.querySelector('.btn-text');
     if (chevron) chevron.innerText = isHidden ? '▲' : '▼';
-    if (textEl) textEl.innerText = isHidden ? '▲ Hide Detailed Telemetry' : 'ℹ️ More Info & Satellite Telemetry';
+    if (textEl) textEl.innerText = isHidden ? '✖ Close Details Palette' : 'ℹ️ More Info & Satellite Telemetry';
     
-    // Auto-refresh Leaflet popup bounds
+    // Auto-refresh Leaflet popup bounds smoothly and pan up slightly so content is visible
+    if (map && map._popup) {
+        setTimeout(() => {
+            map._popup.update();
+            if (isHidden) {
+                const px = map.project(map._popup.getLatLng());
+                px.y -= 60;
+                map.panTo(map.unproject(px), { animate: true, duration: 0.25 });
+            }
+        }, 40);
+    }
+};
+
+window.closeHotspotPalette = function(btn, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const card = btn.closest('.spot-popup-card');
+    if (!card) return;
+    const palette = card.querySelector('.expanded-info-palette');
+    const toggleBtn = card.querySelector('.more-info-toggle-btn');
+    if (palette) palette.style.display = 'none';
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active-open');
+        const chevron = toggleBtn.querySelector('.chevron');
+        const textEl = toggleBtn.querySelector('.btn-text');
+        if (chevron) chevron.innerText = '▼';
+        if (textEl) textEl.innerText = 'ℹ️ More Info & Satellite Telemetry';
+    }
     if (map && map._popup) {
         setTimeout(() => map._popup.update(), 30);
     }
@@ -532,7 +577,14 @@ function loadData() {
         .then(data => {
             if (data.error) return;
             
-            updateAcquisitionTime(data.features);
+            // If user currently has an open popup on the map (e.g. reading details),
+            // do NOT wipe the map layers so the details palette stays open and stable!
+            const isUserInspecting = (map && map._popup && map.hasLayer(map._popup));
+            if (isUserInspecting) {
+                // Update stats and incident feed, but don't disrupt the active inspection popup
+                updateAnalyticsChart(counts);
+                return;
+            }
 
             // Capture currently open popup to restore it after refresh
             let openPopupCoords = null;
@@ -542,6 +594,16 @@ function loadData() {
 
             // Clear only hotspot layers here (after data arrives — prevents flicker)
             clearHotspotLayers();
+
+            const popupConfig = {
+                maxWidth: 330,
+                minWidth: 280,
+                closeOnClick: false,    // Keeps details palette open when clicking or dragging the map!
+                autoClose: true,        // Switches cleanly if user clicks a different fire spot
+                closeButton: true,      // User explicitly closes via 'X' or 'Close Details Palette'
+                autoPan: true,
+                autoPanPadding: [25, 25]
+            };
 
             L.geoJSON(data, {
                 style: function(feature) {
@@ -590,8 +652,8 @@ function loadData() {
                         fillOpacity: isCritical ? 0.9 : 0.7,
                     });
 
-                    layer.bindPopup(buildPopupHTML(feature), { maxWidth: 320 });
-                    circle.bindPopup(buildPopupHTML(feature), { maxWidth: 320 });
+                    layer.bindPopup(buildPopupHTML(feature), popupConfig);
+                    circle.bindPopup(buildPopupHTML(feature), popupConfig);
 
                     const dualLayer = L.featureGroup();
                     dualLayer._polygon = layer;
@@ -745,7 +807,7 @@ function loadData() {
         })
         .catch(err => console.error('Error loading hotspots:', err))
         .finally(() => {
-            setTimeout(loadData, 15000); // Recursive call ensures no overlap
+            setTimeout(loadData, 60000); // Recursive call ensures no overlap
         });
 }
 

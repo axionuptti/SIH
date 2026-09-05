@@ -581,8 +581,19 @@ body {
 .spot-popup-card {
     font-family: 'Outfit', sans-serif;
     color: #e2e8f0;
-    min-width: 270px;
-    max-width: 310px;
+    min-width: 280px;
+    max-width: 320px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.spot-popup-card::-webkit-scrollbar {
+    width: 4px;
+}
+.spot-popup-card::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }
 
 .popup-header {
@@ -759,6 +770,44 @@ body {
     border-color: rgba(56, 189, 248, 0.6);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+}
+
+.more-info-toggle-btn.active-open {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.more-info-toggle-btn.active-open:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.6);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.close-palette-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: #94a3b8;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.close-palette-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.35);
 }
 
 .expanded-info-palette {
