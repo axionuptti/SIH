@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style_v8.css?v=37">
+    <link rel="stylesheet" href="style_v8.css?v=38">
 </head>
 <body>
 
@@ -241,6 +241,11 @@
                     <button class="mode-pill-btn" onclick="window.resetWorldView()" title="Fit World Map to Frame">
                         <span>🌐 Fit World</span>
                     </button>
+
+                    <!-- Expand / Full Frame Map Button -->
+                    <button class="mode-pill-btn" onclick="window.toggleFullScreen()" title="Expand Map across the entire window frame">
+                        <span id="expand-btn-icon">⛶ Expand</span>
+                    </button>
                 </div>
 
                 <!-- Floating Bottom Dock: Analytics Drawer Trigger on Map -->
@@ -409,6 +414,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom JS -->
-    <script src="app_v8.js?v=37"></script>
+    <script src="app_v8.js?v=38"></script>
 </body>
 </html>

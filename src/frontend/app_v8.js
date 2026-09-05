@@ -19,13 +19,13 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 
 const map = L.map('map', {
     zoomControl: false,
-    minZoom: 1.5, // Allow viewing whole planet smoothly
-    maxBounds: worldBounds, // Restrict panning to a single Earth
-    maxBoundsViscosity: 0.8, // Smooth bounds
-    zoomSnap: 0.5, // Snaps smoothly to fit any screen aspect ratio
+    minZoom: 1.0, // Allow viewing whole planet smoothly on any monitor
+    maxBounds: [[-85, -180], [85, 180]], // Restrict panning to Earth
+    maxBoundsViscosity: 0.6,
+    zoomSnap: 0.25, // Snaps smoothly to fit any screen aspect ratio perfectly
     zoomDelta: 0.5,
     closePopupOnClick: false // Prevents clicks on map from closing popups!
-}).setView([18.0, 15.0], 2);
+});
 map.options.closePopupOnClick = false;
 
 // Satellite base layer
@@ -53,14 +53,17 @@ fullScreenControl.addTo(map);
 
 window.isFullScreen = false;
 window.toggleFullScreen = function(e) {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     window.isFullScreen = !window.isFullScreen;
     const sidebar = document.querySelector('.sidebar');
+    const expandBtnIcon = document.getElementById('expand-btn-icon');
     if (window.isFullScreen) {
         sidebar.classList.add('fullscreen-hide');
+        if (expandBtnIcon) expandBtnIcon.innerText = '⤢ Exit Full';
         document.getElementById('critical-alert').style.left = '50%';
     } else {
         sidebar.classList.remove('fullscreen-hide');
+        if (expandBtnIcon) expandBtnIcon.innerText = '⛶ Expand';
         // Reset to responsive centering logic
         if (window.innerWidth > 992) {
             document.getElementById('critical-alert').style.left = 'calc(360px + (100vw - 360px) / 2)';
@@ -71,6 +74,7 @@ window.toggleFullScreen = function(e) {
     setTimeout(() => {
         clearInterval(resizeInterval);
         map.invalidateSize();
+        if (window.fitMapToFrame) window.fitMapToFrame(true);
     }, 450);
 };
 
@@ -1114,22 +1118,35 @@ window.toggleAnalyticsDrawer = function(forceOpen) {
     }
 };
 
-window.resetWorldView = function() {
+window.fitMapToFrame = function(animate = true) {
+    if (typeof map === 'undefined' || !map) return;
     map.invalidateSize();
-    map.setView([18.0, 15.0], 2, { animate: true });
+    // Seamlessly fit the populated global landmasses into whatever the frame dimensions are
+    map.fitBounds([[-52, -165], [68, 175]], {
+        padding: [15, 15],
+        animate: animate,
+        maxZoom: 3.5
+    });
+};
+
+window.resetWorldView = function() {
+    window.fitMapToFrame(true);
 };
 
 // Window resize listener
 window.addEventListener('resize', () => {
-    if (typeof map !== 'undefined') map.invalidateSize();
-});
-
-// Adjust map tiles to full frame size
-setTimeout(() => {
     if (typeof map !== 'undefined') {
         map.invalidateSize();
     }
-}, 100);
+});
+
+// Adjust map tiles to full frame size cleanly on start
+setTimeout(() => {
+    if (typeof map !== 'undefined') {
+        map.invalidateSize();
+        window.fitMapToFrame(false);
+    }
+}, 150);
 setTimeout(() => {
     if (typeof map !== 'undefined') {
         map.invalidateSize();
