@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -25,11 +25,11 @@ async def startup_event():
     async def sync_loop():
         # Immediate sync on startup if needed
         try:
-            sync_manager.sync_from_firms(force=False)
+            await asyncio.to_thread(sync_manager.sync_from_firms, False)
             data = load_geojson("data/processed/classified_hotspots.geojson")
             if data:
                 from src.api.alerts import check_and_send_alerts
-                check_and_send_alerts(data)
+                await asyncio.to_thread(check_and_send_alerts, data)
         except Exception as e:
             print(f"Startup satellite sync error: {e}")
 
@@ -39,11 +39,11 @@ async def startup_event():
             # while capturing every new Near-Real-Time orbital fire pass.
             await asyncio.sleep(600)
             try:
-                sync_manager.sync_from_firms(force=False)
+                await asyncio.to_thread(sync_manager.sync_from_firms, False)
                 data = load_geojson("data/processed/classified_hotspots.geojson")
                 if data:
                     from src.api.alerts import check_and_send_alerts
-                    check_and_send_alerts(data)
+                    await asyncio.to_thread(check_and_send_alerts, data)
             except Exception as e:
                 print(f"Periodic live sync error: {e}")
                 
@@ -103,10 +103,40 @@ def not_found(resource: str, run_cmd: str = None):
 # ─── Fire Detection Endpoints ─────────────────────────────────────────────────
 
 @app.get("/api/hotspots", tags=["Fire"])
-def get_hotspots():
+def get_hotspots(request: Request):
     """Classified AI hotspots with confidence scores and tactical metadata."""
-    data = load_geojson("data/processed/classified_hotspots.geojson")
-    return data or not_found("classified_hotspots.geojson", "python src/models/inference.py")
+    hotspots_path = "data/processed/classified_hotspots.geojson"
+    if not os.path.exists(hotspots_path):
+        return not_found("classified_hotspots.geojson", "python src/models/inference.py")
+
+    mtime = os.path.getmtime(hotspots_path)
+    etag = f'"{mtime}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304)
+
+    data = load_geojson(hotspots_path)
+    if not data:
+        return not_found("classified_hotspots.geojson", "python src/models/inference.py")
+
+    response = JSONResponse(content=data)
+    response.headers["ETag"] = etag
+    response.headers["Last-Modified"] = str(mtime)
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
+@app.get("/api/data/version", tags=["Sync"])
+def get_data_version():
+    """Ultra-lightweight endpoint (~100 bytes) for client-side change detection to avoid unneeded refreshes."""
+    status = sync_manager.get_status()
+    return {
+        "version": status.get("data_version"),
+        "mtime": status.get("data_mtime"),
+        "total_fires": status.get("total_fires_active"),
+        "latest_satellite_acq": status.get("latest_satellite_acq"),
+        "next_sync_seconds": status.get("next_sync_seconds"),
+        "is_syncing": status.get("is_syncing")
+    }
 
 
 

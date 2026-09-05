@@ -389,7 +389,7 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 Open: **http://localhost:8000/dashboard**
 
-The dashboard auto-refreshes every **30 seconds**.
+The dashboard automatically checks for satellite updates and refreshes **only when new data is available**.
 
 ---
 

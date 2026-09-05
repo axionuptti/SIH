@@ -69,6 +69,15 @@ class LiveSyncManager:
         elapsed = (time.time() - self.last_sync_time.timestamp()) if self.last_sync_time else None
         next_sync = max(0, int(SYNC_INTERVAL_SECONDS - elapsed)) if elapsed is not None else 0
         
+        file_mtime = 0
+        if os.path.exists(PROCESSED_GEOJSON_PATH):
+            try:
+                file_mtime = os.path.getmtime(PROCESSED_GEOJSON_PATH)
+            except Exception:
+                pass
+        
+        version_fingerprint = f"{file_mtime}_{self.sync_count}_{self.latest_acq_utc}_{self.total_fires_synced}"
+
         return {
             "status": "syncing" if self.is_syncing else ("active" if self.last_sync_time else "ready"),
             "is_syncing": self.is_syncing,
@@ -78,6 +87,8 @@ class LiveSyncManager:
             "sync_interval_seconds": SYNC_INTERVAL_SECONDS,
             "next_sync_seconds": next_sync,
             "sync_count": self.sync_count,
+            "data_mtime": file_mtime,
+            "data_version": version_fingerprint,
             "api_policy": "NASA FIRMS NRT (5,000 requests / 10-minute interval)",
             "sensors": [s["name"] for s in SOURCES],
             "last_error": self.last_error
