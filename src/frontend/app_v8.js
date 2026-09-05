@@ -145,7 +145,7 @@ function formatAcqTime(timeStr) {
     return `${t.slice(0, 2)}:${t.slice(2)} UTC`;
 }
 
-// ─── Dynamic Address Fetching for Popups ─────────────────────────────────────
+// ─── Popup Open Event Interception ──────────────────────────────────────────
 map.on('popupopen', function(e) {
     const popupContent = e.popup.getElement();
     if (!popupContent) return;
@@ -161,35 +161,6 @@ map.on('popupopen', function(e) {
             if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
         }, { passive: false });
     });
-    
-    const addressSpan = popupContent.querySelector('.address-loader');
-    if (addressSpan && !addressSpan.dataset.loaded) {
-        addressSpan.dataset.loaded = 'true';
-        const lat = addressSpan.getAttribute('data-lat');
-        const lon = addressSpan.getAttribute('data-lon');
-        
-        if (lat && lon) {
-            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
-                .then(r => r.json())
-                .then(d => {
-                    if (d && d.address) {
-                        const city = d.address.city || d.address.town || d.address.village || d.address.municipality || d.address.county || d.address.state_district || '';
-                        const state = d.address.state || '';
-                        const country = d.address.country || d.display_name || '';
-                        const fullAddr = [city, state, country].filter(Boolean).join(', ');
-                        addressSpan.innerText = fullAddr || d.display_name || `${parseFloat(lat).toFixed(3)}°N, ${parseFloat(lon).toFixed(3)}°E`;
-                    } else if (d && d.display_name) {
-                        addressSpan.innerText = d.display_name;
-                    } else {
-                        addressSpan.innerText = `Region (${parseFloat(lat).toFixed(2)}°N, ${parseFloat(lon).toFixed(2)}°E)`;
-                    }
-                    if (map && map._popup) map._popup.update();
-                })
-                .catch(err => {
-                    addressSpan.innerText = `Wilderness (${parseFloat(lat).toFixed(2)}°N, ${parseFloat(lon).toFixed(2)}°E)`;
-                });
-        }
-    }
 });
 
 /** Count up animation */
@@ -285,12 +256,10 @@ function buildPopupHTML(feature) {
                 </div>
             </div>
 
-            <!-- 1. 📍 LOCATION -->
+            <!-- 1. 📍 LOCATION (Instant 0ms Display) -->
             <div class="popup-section">
                 <div class="section-label">📍 Fire Location</div>
-                <div class="address-text address-loader" data-lat="${p.latitude}" data-lon="${p.longitude}">
-                    Loading location...
-                </div>
+                <div class="address-text">${p.location_name || `${lat}°N, ${lon}°E`}</div>
                 <div class="coords-subtext">${lat}°N, ${lon}°E</div>
             </div>
 
@@ -453,7 +422,7 @@ window.toggleHotspotPalette = function(btn, event) {
     if (!card) return;
     const palette = card.querySelector('.expanded-info-palette');
     if (!palette) return;
-    const isHidden = palette.style.display === 'none';
+    const isHidden = (palette.style.display === 'none' || !palette.style.display);
     palette.style.display = isHidden ? 'block' : 'none';
     
     if (isHidden) {
@@ -466,21 +435,6 @@ window.toggleHotspotPalette = function(btn, event) {
     const textEl = btn.querySelector('.btn-text');
     if (chevron) chevron.innerText = isHidden ? '▲' : '▼';
     if (textEl) textEl.innerText = isHidden ? '✖ Close Details Palette' : 'ℹ️ More Info & Satellite Telemetry';
-    
-    // Smoothly update popup layout without closing it or triggering jumpy map animations
-    setTimeout(() => {
-        if (map) {
-            map.eachLayer(l => {
-                if (l.getPopup && l.isPopupOpen && l.isPopupOpen()) {
-                    const pop = l.getPopup();
-                    if (pop && pop.update) pop.update();
-                }
-            });
-            if (map._popup && map._popup.update) {
-                map._popup.update();
-            }
-        }
-    }, 20);
 };
 
 window.closeHotspotPalette = function(btn, event) {
@@ -488,9 +442,6 @@ window.closeHotspotPalette = function(btn, event) {
         event.stopPropagation();
         if (event.stopImmediatePropagation) event.stopImmediatePropagation();
         if (event.preventDefault) event.preventDefault();
-    }
-    if (window.L && L.DomEvent && event) {
-        L.DomEvent.stopPropagation(event);
     }
     const card = btn.closest('.spot-popup-card');
     if (!card) return;
@@ -504,19 +455,6 @@ window.closeHotspotPalette = function(btn, event) {
         if (chevron) chevron.innerText = '▼';
         if (textEl) textEl.innerText = 'ℹ️ More Info & Satellite Telemetry';
     }
-    setTimeout(() => {
-        if (map) {
-            map.eachLayer(l => {
-                if (l.getPopup && l.isPopupOpen && l.isPopupOpen()) {
-                    const pop = l.getPopup();
-                    if (pop && pop.update) pop.update();
-                }
-            });
-            if (map._popup && map._popup.update) {
-                map._popup.update();
-            }
-        }
-    }, 20);
 };
 
 // ─── Main Data Loader ─────────────────────────────────────────────────────────
@@ -695,14 +633,6 @@ function loadData() {
                     });
 
                     circle.bindPopup(buildPopupHTML(feature), popupConfig);
-
-                    // Ensure marker click always opens popup and NEVER toggles it closed
-                    circle.on('click', function(e) {
-                        if (e && e.originalEvent) {
-                            L.DomEvent.stopPropagation(e.originalEvent);
-                        }
-                        circle.openPopup();
-                    });
 
                     if (layerGroups[cls]) {
                         layerGroups[cls].addLayer(circle);
@@ -931,9 +861,219 @@ window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
     }
 };
 
+// ─── Global Fire History Graph (World Map Analysis) ────────────────────────
+let fireHistoryChartInstance = null;
+function loadFireHistoryChart() {
+    fetch('/api/analytics/history')
+        .then(r => r.json())
+        .then(data => {
+            if (!Array.isArray(data) || data.length === 0) return;
+            const ctx = document.getElementById('fireHistoryChart');
+            if (!ctx) return;
+
+            // Format labels: 'Aug 24', 'Aug 25', ..., 'Sep 05'
+            const labels = data.map(d => {
+                const parts = d.date.split('-');
+                const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+
+            const industrialData = data.map(d => d.industrial);
+            const forestData = data.map(d => d.forest);
+            const agriData = data.map(d => d.agri);
+            const frpData = data.map(d => d.avg_frp);
+
+            // Calculate KPIs
+            const totalHotspots = data.reduce((acc, d) => acc + d.total, 0);
+            const peakItem = data.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), data[0]);
+            const peakIdx = data.indexOf(peakItem);
+            const peakDateStr = peakIdx >= 0 ? labels[peakIdx] : '';
+            const overallAvgFrp = (data.reduce((acc, d) => acc + (d.avg_frp * d.total), 0) / Math.max(totalHotspots, 1)).toFixed(1);
+
+            const peakEl = document.getElementById('hist-peak-vol');
+            if (peakEl) peakEl.innerText = `${peakItem.total} Fires (${peakDateStr})`;
+            const avgEl = document.getElementById('hist-avg-frp');
+            if (avgEl) avgEl.innerText = `${overallAvgFrp} MW`;
+            const totEl = document.getElementById('hist-total-fires');
+            if (totEl) totEl.innerText = `${totalHotspots.toLocaleString()} Hotspots`;
+
+            if (fireHistoryChartInstance) {
+                fireHistoryChartInstance.data.labels = labels;
+                fireHistoryChartInstance.data.datasets[0].data = industrialData;
+                fireHistoryChartInstance.data.datasets[1].data = forestData;
+                fireHistoryChartInstance.data.datasets[2].data = agriData;
+                fireHistoryChartInstance.data.datasets[3].data = frpData;
+                fireHistoryChartInstance.update();
+                return;
+            }
+
+            fireHistoryChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Industrial Fire',
+                            data: industrialData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                            borderRadius: 4,
+                            stack: 'fires',
+                            order: 2
+                        },
+                        {
+                            label: 'Forest Fire',
+                            data: forestData,
+                            backgroundColor: 'rgba(249, 115, 22, 0.8)',
+                            borderRadius: 4,
+                            stack: 'fires',
+                            order: 2
+                        },
+                        {
+                            label: 'Agri Burn',
+                            data: agriData,
+                            backgroundColor: 'rgba(250, 204, 21, 0.75)',
+                            borderRadius: 4,
+                            stack: 'fires',
+                            order: 2
+                        },
+                        {
+                            label: 'Mean FRP (MW)',
+                            data: frpData,
+                            type: 'line',
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            borderWidth: 2.5,
+                            pointBackgroundColor: '#38bdf8',
+                            pointRadius: 3.5,
+                            tension: 0.35,
+                            yAxisID: 'yFrp',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleFont: { family: 'Outfit', size: 13, weight: 'bold' },
+                            bodyFont: { family: 'Outfit', size: 12 },
+                            padding: 10,
+                            cornerRadius: 8,
+                            borderColor: 'rgba(255, 255, 255, 0.12)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } }
+                        },
+                        y: {
+                            stacked: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } },
+                            title: { display: true, text: 'Fires Detected', color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
+                        },
+                        yFrp: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: {
+                                color: '#38bdf8',
+                                font: { family: 'Outfit', size: 11 },
+                                callback: v => v + ' MW'
+                            },
+                            title: { display: true, text: 'Avg Radiative Power', color: '#38bdf8', font: { size: 10, family: 'Outfit' } }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(err => console.error('Error loading fire history chart:', err));
+}
+
+// ─── Most Active Global Fire Zones ──────────────────────────────────────────
+window.focusFireZone = function(lat, lon) {
+    if (!map) return;
+    map.flyTo([lat, lon], 5, {
+        animate: true,
+        duration: 1.5
+    });
+    const mapWrapper = document.querySelector('.map-wrapper');
+    if (mapWrapper) {
+        mapWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+};
+
+function loadActiveFireZones() {
+    fetch('/api/analytics/zones')
+        .then(r => r.json())
+        .then(zones => {
+            const listEl = document.getElementById('active-zones-list');
+            if (!listEl) return;
+            if (!Array.isArray(zones) || zones.length === 0) {
+                listEl.innerHTML = '<div style="color:#94a3b8; font-size:0.8rem; text-align:center; padding:15px;">No active clusters found.</div>';
+                return;
+            }
+
+            const badge = document.getElementById('active-zones-badge');
+            if (badge) badge.innerText = `${zones.length} Monitored Hubs`;
+
+            let html = '';
+            zones.forEach(z => {
+                const sampleText = z.sample_cities && z.sample_cities.length > 0
+                    ? `· ${z.sample_cities.join(', ')}`
+                    : '';
+                
+                let icon = '🔥';
+                if (z.industrial_fires > 0) icon = '🏭';
+                else if (z.max_frp >= 200) icon = '⚡';
+
+                html += `
+                <div class="zone-item-card" onclick="window.focusFireZone(${z.center_lat}, ${z.center_lon})">
+                    <div class="zone-info">
+                        <div class="zone-name-row">
+                            <span style="font-size:1.1rem;">${icon}</span>
+                            <div>
+                                <div class="zone-name">${z.zone_name}</div>
+                                <div class="zone-region">${z.region} ${sampleText}</div>
+                            </div>
+                        </div>
+                        <div class="zone-metrics-row">
+                            <span>Total: <strong style="color:#f8fafc;">${z.total_fires}</strong></span>
+                            ${z.industrial_fires > 0 ? `<span style="color:#ef4444; font-weight:600;">● ${z.industrial_fires} Industrial</span>` : ''}
+                            ${z.forest_fires > 0 ? `<span style="color:#f97316;">● ${z.forest_fires} Forest</span>` : ''}
+                            ${z.agri_fires > 0 ? `<span style="color:#facc15;">● ${z.agri_fires} Agri</span>` : ''}
+                            <span>Peak: <strong style="color:#38bdf8;">${z.max_frp} MW</strong></span>
+                        </div>
+                    </div>
+                    <button class="zone-focus-btn" onclick="event.stopPropagation(); window.focusFireZone(${z.center_lat}, ${z.center_lon});">
+                        <span>🎯 Focus</span>
+                    </button>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        })
+        .catch(err => console.error('Error loading active fire zones:', err));
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadData();
-// Data syncs on loadData
+loadFireHistoryChart();
+loadActiveFireZones();
+
+// Adjust map tiles to compact layout size
+setTimeout(() => {
+    if (typeof map !== 'undefined') {
+        map.invalidateSize();
+    }
+}, 150);
 
 // ─── Right Panel Toggle ───────────────────────────────────────────────────────
 window.toggleRightPanel = function() {

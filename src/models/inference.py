@@ -453,6 +453,33 @@ def run_inference():
     gdf['risk_level'] = risk_levels
     gdf['mitigation_strategy'] = strategies
 
+    # 5b. Reverse Geocode for Instant Location Display
+    try:
+        import reverse_geocode
+        coords = [(row['latitude'], row['longitude']) for _, row in gdf.iterrows()]
+        geo_results = reverse_geocode.search(coords)
+        location_names = []
+        countries = []
+        states = []
+        cities = []
+        for r in geo_results:
+            city = r.get('city', '')
+            state = r.get('state', '')
+            country = r.get('country', '')
+            parts = [p for p in [city, state, country] if p]
+            loc_str = ', '.join(parts) if parts else country or 'Global Wildland'
+            location_names.append(loc_str)
+            countries.append(country)
+            states.append(state)
+            cities.append(city)
+        gdf['location_name'] = location_names
+        gdf['country'] = countries
+        gdf['state'] = states
+        gdf['city'] = cities
+    except Exception as e:
+        print(f"   ⚠️ Reverse geocoding warning: {e}")
+        gdf['location_name'] = [f"Region ({lat:.2f}°N, {lon:.2f}°E)" for lat, lon in zip(gdf['latitude'], gdf['longitude'])]
+
     # 6. Save Point Data
     print(f"\n💾 Saving outputs...")
     out_path_points = "data/processed/classified_hotspots.geojson"
