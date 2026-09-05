@@ -27,6 +27,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 from shapely.geometry import Polygon, LineString
+from global_land_mask import globe
 from src.models.satellite_vision import classify_hotspots_terrain_batch_detailed
 
 # ─── Physical Constants ────────────────────────────────────────────────────────
@@ -367,13 +368,31 @@ def run_inference():
         cls_name = CLASS_MAP[pred_idx]
         conf_pct = float(probas[i, pred_idx] * 100.0)
         row = gdf.iloc[i]
+        lat = float(row['latitude'])
+        lon = float(row['longitude'])
+        is_on_land = bool(globe.is_land(lat, lon))
         
         # User mandate & safety verification:
-        # "If there is an industry on the map then only make it industrial fire otherwise its forest fire"
-        if cls_name == 'Industrial Fire' and row['is_industrial_map'] == 0:
-            cls_name = 'Forest Fire'
+        # 1. Any detection in ocean / sea / water MUST be Persistent Industrial Thermal Source (Offshore platform/flare)
+        #    Never classify as Forest Fire or Agricultural Burn in the ocean!
+        if not is_on_land or row.get('satellite_terrain') in ['Water / Offshore', 'Water / Offshore Marine Platform']:
+            cls_name = 'Persistent Industrial Thermal Source'
             conf_pct = 96.0
-        elif cls_name == 'Persistent Industrial Thermal Source' and row['is_industrial_map'] == 0 and row['satellite_terrain'] != 'Water / Offshore':
+        # 2. If there is no map data available, cannot classify it and keep under Persistent Industrial Thermal Source
+        elif not bool(row.get('location_name') or row.get('country') or row.get('zone_type')):
+            cls_name = 'Persistent Industrial Thermal Source'
+            conf_pct = 90.0
+        # 3. Regular continuous industrial works -> Persistent Industrial Thermal Source
+        #    Unless FRP >= 120 MW indicating an accidental industrial blaze
+        elif row.get('is_industrial_map', 0) == 1:
+            if row.get('frp', 0) >= 120.0:
+                cls_name = 'Industrial Fire'
+                conf_pct = 94.0
+            else:
+                cls_name = 'Persistent Industrial Thermal Source'
+                conf_pct = 95.0
+        # 4. If predicted as Industrial Fire by model but no industry on map, safety fallback to Forest Fire
+        elif cls_name == 'Industrial Fire' and row.get('is_industrial_map', 0) == 0:
             cls_name = 'Forest Fire'
             conf_pct = 95.0
             

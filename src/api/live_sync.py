@@ -16,8 +16,9 @@ import requests
 import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
-from dotenv import load_dotenv
 import reverse_geocode
+from global_land_mask import globe
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -197,15 +198,84 @@ class LiveSyncManager:
                 sat = str(row.get('satellite', 'N20'))
                 conf = str(row.get('confidence', 'nominal'))
 
-                # Tactical Classification rules
-                # 1. Industrial Fire: High FRP + high brightness + nighttime thermal signature or dense flare
-                if frp >= 65.0 or (b4 >= 360.0 and daynight == 'N') or (frp >= 45.0 and b4 >= 355.0):
-                    cls = "Industrial Fire"
-                    ai_conf = round(min(0.96, 0.82 + (frp / 600.0) * 0.14), 2)
-                    terrain = "Industry / Factory"
-                    risk = "High" if frp >= 80.0 else "Medium"
-                    strat = "Deploy Hazmat & Suppress Flare Stack"
-                    speed = round(min(12.0, 2.5 + frp * 0.03), 2)
+                # Tactical Classification rules complying with environmental physics & user mandate:
+                # 1. Check if coordinate is in the Ocean / Sea / Maritime waters
+                is_on_land = bool(globe.is_land(lat, lon))
+                has_map_data = bool(row.get('country') or row.get('city'))
+                loc_raw = row.get('location_name', '')
+
+                # ─────────────────────────────────────────────────────────────
+                # RULE 1: Ocean / Sea / Water Body
+                # ─────────────────────────────────────────────────────────────
+                # There are NO forests or crops in open water. Thermal detections in
+                # the ocean / sea are offshore oil platforms, drilling rigs, flare stacks,
+                # or maritime energy operations -> MUST be Persistent Industrial Thermal Source!
+                if not is_on_land:
+                    cls = "Persistent Industrial Thermal Source"
+                    ai_conf = 0.96
+                    terrain = "Water / Offshore Marine Platform"
+                    risk = "Routine Operational"
+                    strat = "Continuous Offshore Flare Monitoring · Standard Maritime Operations"
+                    speed = 0.0
+                    fac_type = "Offshore Oil/Gas Platform & Flare Rig"
+                    zone_type = "Maritime Energy Extraction Field"
+                    cntry = row.get('country', '')
+                    if cntry:
+                        loc_str = f"Offshore Energy Platform, {cntry} Waters"
+                    else:
+                        loc_str = f"Offshore Energy Platform ({lat:.2f}°, {lon:.2f}°)"
+
+                # ─────────────────────────────────────────────────────────────
+                # RULE 2: No Map Data / Remote Unclassified Coordinates
+                # ─────────────────────────────────────────────────────────────
+                # If there is no map data, cannot classify as forest fire or accidental industrial fire.
+                # Must be kept under Persistent Industrial Thermal Source (ongoing/regular work).
+                elif not has_map_data:
+                    cls = "Persistent Industrial Thermal Source"
+                    ai_conf = 0.88
+                    terrain = "Unmapped Industrial Sector"
+                    risk = "Routine Operational"
+                    strat = "Routine Thermal Tracking & Satellite Emissions Monitoring"
+                    speed = 0.0
+                    fac_type = "Continuous Industrial Thermal Work"
+                    zone_type = "Persistent Thermal Operation"
+                    loc_str = f"Industrial Thermal Zone ({lat:.2f}°, {lon:.2f}°)"
+
+                # ─────────────────────────────────────────────────────────────
+                # RULE 3: Regular Ongoing Industrial Works (Happening Regularly)
+                # ─────────────────────────────────────────────────────────────
+                # Refineries, petrochemical complexes, flare stacks, smelters, steel mills,
+                # cement kilns, and continuous industrial facilities operate 24/7.
+                # Any detection verified on an industrial site or with nighttime industrial thermal signatures:
+                # - If catastrophic emergency hazard spike (FRP >= 120 MW and B4 >= 365 K) -> Industrial Fire
+                # - All regular ongoing industrial operations -> Persistent Industrial Thermal Source
+                elif (row.get('is_industrial', False) or row.get('is_industrial_map', False) or 
+                      (b4 >= 355.0 and daynight == 'N') or 
+                      (b4 >= 360.0 and frp >= 60.0)):
+                    if frp >= 120.0 and b4 >= 365.0:
+                        cls = "Industrial Fire"
+                        ai_conf = round(min(0.98, 0.88 + (frp / 600.0) * 0.10), 2)
+                        terrain = "Industry / Factory"
+                        risk = "Critical Hazard"
+                        strat = "Emergency Hazmat Deployment & Flare Isolation"
+                        speed = round(min(14.0, 3.5 + frp * 0.04), 2)
+                        fac_type = "Critical Industrial Fire Hazard"
+                        zone_type = "High-Risk Industrial Hazard Sector"
+                        loc_str = loc_raw or f"Industrial Fire Zone ({lat:.2f}°, {lon:.2f}°)"
+                    else:
+                        cls = "Persistent Industrial Thermal Source"
+                        ai_conf = round(min(0.96, 0.84 + (frp / 500.0) * 0.11), 2)
+                        terrain = "Industry / Factory"
+                        risk = "Controlled Operational"
+                        strat = "Log Emissions & Routine Operational Monitoring"
+                        speed = round(min(5.0, 1.0 + frp * 0.02), 2)
+                        fac_type = "Regular Operational Industrial Facility"
+                        zone_type = "Continuous Industrial Complex"
+                        loc_str = loc_raw or f"Industrial Facility ({lat:.2f}°, {lon:.2f}°)"
+
+                # ─────────────────────────────────────────────────────────────
+                # RULE 5: Wildfire / Forest Fire (Vegetation strictly on Land)
+                # ─────────────────────────────────────────────────────────────
                 elif frp >= 40.0:
                     cls = "Forest Fire"
                     ai_conf = round(min(0.95, 0.78 + (frp / 400.0) * 0.16), 2)
@@ -213,6 +283,13 @@ class LiveSyncManager:
                     risk = "High" if frp >= 90.0 else "Medium"
                     strat = "Aerial Retardant Drop & Bulldoze Firebreak"
                     speed = round(min(22.0, 4.0 + frp * 0.05), 2)
+                    fac_type = "Wildland Sector"
+                    zone_type = "Natural Forest Vegetation"
+                    loc_str = loc_raw or f"Wildland Region ({lat:.2f}°, {lon:.2f}°)"
+
+                # ─────────────────────────────────────────────────────────────
+                # RULE 6: Agricultural Burn (Crop residue strictly on Land)
+                # ─────────────────────────────────────────────────────────────
                 else:
                     cls = "Agricultural Burn"
                     ai_conf = round(min(0.91, 0.72 + (frp / 100.0) * 0.18), 2)
@@ -220,6 +297,11 @@ class LiveSyncManager:
                     risk = "Low"
                     strat = "Controlled Perimeter Burn Monitoring"
                     speed = round(min(6.0, 1.0 + frp * 0.02), 2)
+                    fac_type = "Agricultural Sector"
+                    zone_type = "Cultivated Crop Field"
+                    loc_str = loc_raw or f"Farmland Region ({lat:.2f}°, {lon:.2f}°)"
+
+                is_industrial_entity = (cls in ["Industrial Fire", "Persistent Industrial Thermal Source"])
 
                 feat = {
                     "type": "Feature",
@@ -244,27 +326,27 @@ class LiveSyncManager:
                         "daynight": daynight,
                         "brightness": b4,
                         "brightness_bg": float(row.get('bright_ti5', 285.0)),
-                        "is_industrial": (cls == "Industrial Fire"),
-                        "facility_type": "Industrial Facility" if cls == "Industrial Fire" else "Wildland Sector",
-                        "zone_type": "Industrial Complex" if cls == "Industrial Fire" else "Natural Vegetation",
+                        "is_industrial": is_industrial_entity,
+                        "facility_type": fac_type,
+                        "zone_type": zone_type,
                         "temperature": 28.5,
                         "humidity": 45.0,
                         "wind_speed": 14.2,
                         "wind_direction": 220,
-                        "aqi": 115 if cls == "Industrial Fire" else 85,
-                        "persistence": 0.85 if cls == "Industrial Fire" else 0.20,
+                        "aqi": 115 if is_industrial_entity else 85,
+                        "persistence": 0.85 if is_industrial_entity else 0.20,
                         "satellite_terrain": terrain,
-                        "vision_greenery": 12.0 if cls == "Industrial Fire" else 65.0,
-                        "vision_structure": 8.5 if cls == "Industrial Fire" else 1.2,
-                        "vision_built": 0.45 if cls == "Industrial Fire" else 0.05,
+                        "vision_greenery": 5.0 if not is_on_land else (12.0 if is_industrial_entity else 65.0),
+                        "vision_structure": 9.0 if is_industrial_entity else 1.2,
+                        "vision_built": 0.50 if is_industrial_entity else 0.05,
                         "tile_url": f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/15/{lat}/{lon}",
-                        "is_industrial_map": (cls == "Industrial Fire"),
+                        "is_industrial_map": is_industrial_entity,
                         "ai_classification": cls,
                         "ai_confidence": ai_conf,
                         "spread_speed_kmh": speed,
                         "risk_level": risk,
                         "mitigation_strategy": strat,
-                        "location_name": row.get('location_name', f"Region ({lat:.2f}°, {lon:.2f}°)"),
+                        "location_name": loc_str,
                         "country": row.get('country', ''),
                         "state": row.get('state', ''),
                         "city": row.get('city', '')
@@ -273,16 +355,33 @@ class LiveSyncManager:
                 features.append(feat)
 
             # Preserve confirmed persistent ground-truth industrial facilities from previous catalogue
-            # (e.g. Jamnagar, Jurong, Houston, Ras Tanura) so they remain continuously monitored
+            # (e.g. Jamnagar, Jurong, Houston, Ras Tanura) ensuring they are marked under Persistent Industrial Thermal Source
             if os.path.exists(PROCESSED_GEOJSON_PATH):
                 try:
                     with open(PROCESSED_GEOJSON_PATH, "r", encoding="utf-8") as f_prev:
                         prev_data = json.load(f_prev)
                         for pf in prev_data.get("features", []):
-                            if pf["properties"].get("ai_classification") == "Industrial Fire":
-                                # If coordinate not already present in live feed, keep it
-                                p_lat = round(pf["properties"]["latitude"], 3)
-                                p_lon = round(pf["properties"]["longitude"], 3)
+                            p = pf.get("properties", {})
+                            p_lat = round(p.get("latitude", 0), 3)
+                            p_lon = round(p.get("longitude", 0), 3)
+                            p_land = bool(globe.is_land(p_lat, p_lon))
+                            
+                            # Standardize classification for persistent facilities
+                            if not p_land or p.get("ai_classification") in ["Industrial Fire", "Persistent Industrial Thermal Source"]:
+                                if not p_land:
+                                    p["ai_classification"] = "Persistent Industrial Thermal Source"
+                                    p["satellite_terrain"] = "Water / Offshore Marine Platform"
+                                    p["facility_type"] = "Offshore Oil/Gas Platform & Flare Rig"
+                                    p["zone_type"] = "Maritime Energy Extraction Field"
+                                    p["risk_level"] = "Routine Operational"
+                                    p["mitigation_strategy"] = "Continuous Offshore Flare Monitoring · Standard Maritime Operations"
+                                elif p.get("frp", 0) < 120.0:
+                                    p["ai_classification"] = "Persistent Industrial Thermal Source"
+                                    p["facility_type"] = p.get("facility_type") if p.get("facility_type") and p.get("facility_type") != "Unknown" else "Regular Operational Industrial Facility"
+                                    p["zone_type"] = p.get("zone_type") if p.get("zone_type") and p.get("zone_type") != "Unknown" else "Continuous Industrial Complex"
+                                    p["risk_level"] = "Controlled Operational"
+                                    p["mitigation_strategy"] = "Log Emissions & Routine Operational Monitoring"
+
                                 already_has = any(
                                     round(f["properties"]["latitude"], 3) == p_lat and 
                                     round(f["properties"]["longitude"], 3) == p_lon
