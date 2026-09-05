@@ -18,6 +18,7 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 })();
 
 const map = L.map('map', {
+    preferCanvas: true, // Hardware-accelerated Canvas rendering for zero lag on 4000+ points
     zoomControl: false,
     minZoom: 2.75, // Zoomed in enough so satellite imagery covers 100% of canvas with NO "Map data not available"
     maxZoom: 18,
@@ -793,121 +794,16 @@ function loadData() {
 }
 
 // ─── NASA Satellite Sync & Real-Time Cadence Engine ───────────────────────────
-window.syncCountdownSeconds = 600;
+// Relaxed 5-minute (300s) auto-refresh cadence: zero network polling lag during countdown
+window.syncCountdownSeconds = 300;
 window.latestSatelliteAcqStr = "Connecting...";
 window.totalFiresSynced = 0;
-window.lastLoadedDataVersion = null;
-window.isCheckingUpdates = false;
-
-// Notification toast when new satellite data is synced
-function showDataUpdateToast(info) {
-    let toast = document.getElementById('data-update-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'data-update-toast';
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 32px;
-            right: 32px;
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(56, 189, 248, 0.6);
-            backdrop-filter: blur(12px);
-            color: #f8fafc;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.88rem;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(56,189,248,0.25);
-            z-index: 99999;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            pointer-events: none;
-        `;
-        document.body.appendChild(toast);
-    }
-    const count = (info && info.total_fires) ? info.total_fires.toLocaleString() : (window.totalFiresSynced ? window.totalFiresSynced.toLocaleString() : 'Active');
-    const acq = (info && info.latest_satellite_acq) || window.latestSatelliteAcqStr || 'Latest Pass';
-    toast.innerHTML = `
-        <span style="font-size: 1.3rem;">🛰️</span>
-        <div>
-            <div style="font-weight: 600; color: #38bdf8;">New Satellite Data Available</div>
-            <div style="font-size: 0.76rem; color: #94a3b8;">Dashboard refreshed · ${count} hotspots · ${acq}</div>
-        </div>
-    `;
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(20px)';
-    }, 5000);
-}
-
-// Check for updates: ONLY refreshes the page/dashboard when new data is detected
-function checkForUpdates(forceRefresh = false) {
-    if (window.isCheckingUpdates) return Promise.resolve(false);
-    window.isCheckingUpdates = true;
-
-    return fetch('/api/data/version')
-        .then(r => r.json())
-        .then(info => {
-            window.isCheckingUpdates = false;
-            if (!info || !info.version) return false;
-
-            if (info.next_sync_seconds !== undefined) {
-                if (Math.abs(window.syncCountdownSeconds - info.next_sync_seconds) > 5) {
-                    window.syncCountdownSeconds = info.next_sync_seconds;
-                }
-            }
-            if (info.latest_satellite_acq) {
-                window.latestSatelliteAcqStr = info.latest_satellite_acq;
-            }
-            if (info.total_fires) {
-                window.totalFiresSynced = info.total_fires;
-            }
-            renderSyncInfo(info);
-
-            const isInitial = (window.lastLoadedDataVersion === null);
-            const hasNewData = (!isInitial && info.version !== window.lastLoadedDataVersion);
-
-            if (isInitial || forceRefresh) {
-                window.lastLoadedDataVersion = info.version;
-                loadData();
-                return true;
-            } else if (hasNewData) {
-                console.log(`[Data Sync] New satellite data available! Refreshing dashboard (${window.lastLoadedDataVersion} -> ${info.version})`);
-                window.lastLoadedDataVersion = info.version;
-                
-                // Refresh dashboard components with the new data
-                loadData();
-                loadFireHistoryChart();
-                loadActiveFireZones();
-                fetchSyncStatus();
-                showDataUpdateToast(info);
-                return true;
-            } else {
-                // No new data available! Strictly DO NOT refresh or wipe anything!
-                return false;
-            }
-        })
-        .catch(err => {
-            window.isCheckingUpdates = false;
-            console.warn('[Data Version Check] Warning:', err);
-            return false;
-        });
-}
 
 function fetchSyncStatus() {
     fetch('/api/sync/status')
         .then(r => r.json())
         .then(info => {
             if (info) {
-                if (info.next_sync_seconds !== undefined) {
-                    window.syncCountdownSeconds = info.next_sync_seconds;
-                }
                 if (info.latest_satellite_acq) {
                     window.latestSatelliteAcqStr = info.latest_satellite_acq;
                 }
@@ -930,16 +826,16 @@ function renderSyncInfo(info) {
     
     if (timeEl) {
         const satAcq = window.latestSatelliteAcqStr;
-        timeEl.innerHTML = `🛰️ NASA VIIRS: <strong style="color:#38bdf8;">${satAcq}</strong> <span style="margin: 0 4px; opacity:0.5;">·</span> Next Sync: <strong style="color:#facc15;" id="sync-countdown-val">${countdownStr}</strong>`;
+        timeEl.innerHTML = `🛰️ NASA VIIRS: <strong style="color:#38bdf8;">${satAcq}</strong> <span style="margin: 0 4px; opacity:0.5;">·</span> Next Refresh: <strong style="color:#facc15;" id="sync-countdown-val">${countdownStr}</strong>`;
     }
     
     if (syncEl) {
         const count = (info && info.total_fires_active) ? info.total_fires_active.toLocaleString() : (window.totalFiresSynced ? window.totalFiresSynced.toLocaleString() : 'Connecting...');
-        syncEl.innerHTML = `<span style="color:#10b981;">● Synced (${count} Hotspots)</span> <span style="color:#94a3b8; font-size:0.7rem;">· Every 10m (NASA EOSDIS)</span>`;
+        syncEl.innerHTML = `<span style="color:#10b981;">● Synced (${count} Hotspots)</span> <span style="color:#94a3b8; font-size:0.7rem;">· Auto-refresh every 5m</span>`;
     }
 }
 
-// 1-second dynamic countdown ticker
+// 1-second dynamic countdown ticker (pure timer, zero server requests during countdown)
 if (!window.syncTimerInterval) {
     window.syncTimerInterval = setInterval(() => {
         if (window.syncCountdownSeconds > 0) {
@@ -950,15 +846,11 @@ if (!window.syncTimerInterval) {
                 const secs = window.syncCountdownSeconds % 60;
                 countSpan.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
             }
-            // Lightweight check every 30 seconds to detect if new satellite pass or pipeline data is available
-            // Strictly does NOT refresh the page unless new data has actually arrived!
-            if (window.syncCountdownSeconds % 30 === 0) {
-                checkForUpdates(false);
-            }
         } else {
-            // Countdown reached 0 -> check if new NASA pass has arrived
-            window.syncCountdownSeconds = 600;
-            checkForUpdates(false);
+            // 5 minutes reached: refresh the page data quietly and reset timer
+            window.syncCountdownSeconds = 300;
+            loadData();
+            fetchSyncStatus();
         }
     }, 1000);
 }
@@ -974,31 +866,18 @@ window.triggerLiveSync = function(event) {
     fetch('/api/sync/now?force=true', { method: 'POST' })
         .then(r => r.json())
         .then(res => {
-            // Check if backend actually updated data
-            fetch('/api/data/version')
-                .then(r => r.json())
-                .then(info => {
-                    const hasNewData = (info && info.version !== window.lastLoadedDataVersion);
-                    if (hasNewData) {
-                        window.lastLoadedDataVersion = info.version;
-                        loadData();
-                        loadFireHistoryChart();
-                        loadActiveFireZones();
-                        fetchSyncStatus();
-                        showDataUpdateToast(info);
-                        if (btn) btn.innerHTML = `<span style="color:#34d399;">✅ Synced!</span>`;
-                    } else {
-                        // Data already up to date - no refresh needed
-                        fetchSyncStatus();
-                        if (btn) btn.innerHTML = `<span style="color:#38bdf8;">✓ Feed Up to Date</span>`;
-                    }
-                    setTimeout(() => {
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.innerHTML = `<span id="sync-btn-spinner">🔄</span> <span>Sync Feed</span>`;
-                        }
-                    }, 2500);
-                });
+            window.syncCountdownSeconds = 300; // Reset 5-min timer
+            loadData();
+            loadFireHistoryChart();
+            loadActiveFireZones();
+            fetchSyncStatus();
+            if (btn) {
+                btn.innerHTML = `<span style="color:#34d399;">✅ Synced!</span>`;
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span id="sync-btn-spinner">🔄</span> <span>Sync Feed</span>`;
+                }, 2000);
+            }
         })
         .catch(() => {
             if (btn) {
@@ -1291,7 +1170,7 @@ function loadActiveFireZones() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-checkForUpdates(true);
+loadData();
 loadFireHistoryChart();
 loadActiveFireZones();
 fetchSyncStatus();

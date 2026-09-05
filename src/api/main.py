@@ -103,26 +103,10 @@ def not_found(resource: str, run_cmd: str = None):
 # ─── Fire Detection Endpoints ─────────────────────────────────────────────────
 
 @app.get("/api/hotspots", tags=["Fire"])
-def get_hotspots(request: Request):
+def get_hotspots():
     """Classified AI hotspots with confidence scores and tactical metadata."""
-    hotspots_path = "data/processed/classified_hotspots.geojson"
-    if not os.path.exists(hotspots_path):
-        return not_found("classified_hotspots.geojson", "python src/models/inference.py")
-
-    mtime = os.path.getmtime(hotspots_path)
-    etag = f'"{mtime}"'
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304)
-
-    data = load_geojson(hotspots_path)
-    if not data:
-        return not_found("classified_hotspots.geojson", "python src/models/inference.py")
-
-    response = JSONResponse(content=data)
-    response.headers["ETag"] = etag
-    response.headers["Last-Modified"] = str(mtime)
-    response.headers["Cache-Control"] = "no-cache, must-revalidate"
-    return response
+    data = load_geojson("data/processed/classified_hotspots.geojson")
+    return data or not_found("classified_hotspots.geojson", "python src/models/inference.py")
 
 
 @app.get("/api/data/version", tags=["Sync"])
