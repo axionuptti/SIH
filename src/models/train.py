@@ -11,17 +11,17 @@ from sklearn.utils.class_weight import compute_sample_weight
 import joblib
 
 CLASS_MAP = {
-    0: 'Wildfire / Natural',
-    1: 'Industrial Flare',
-    2: 'Accidental Industrial Fire',
-    3: 'Gas Leakage (Chemical)',
-    4: 'Smoke Plume',
+    0: 'Forest Fire',
+    1: 'Industrial Fire',
+    2: 'Persistent Industrial Thermal Source',
+    3: 'Agricultural Burn',
 }
 
 FEATURE_COLS = [
-    'frp', 'brightness', 'is_industrial', 'ch4_concentration',
-    'aerosol_index', 'day_night', 'persistence',
-    'temperature', 'humidity', 'wind_speed'
+    'frp', 'brightness', 'is_industrial_map',
+    'vision_structure', 'vision_greenery', 'vision_built',
+    'persistence', 'ch4_concentration', 'aerosol_index',
+    'day_night', 'temperature', 'humidity', 'wind_speed'
 ]
 
 def train_model():

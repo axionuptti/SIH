@@ -56,16 +56,16 @@ def get_esri_tile_image(lat, lon, zoom=15):
 def analyze_terrain_metrics(img):
     """
     Analyzes high-resolution satellite tile using Computer Vision to distinguish:
-    1. Industry / Factory (Rectilinear buildings, structural lines, steel/concrete roofs)
+    1. Industry / Factory (Rectilinear buildings, structural lines, steel/concrete roofs, paved pads)
     2. Forest Canopy (Dense vegetation, organic leaf texture, minimal linear structure)
     3. Agricultural Farmland (Crops, tilled plots, regular field boundaries)
     4. Water / Offshore (Non-reflective blue/dark oceanic surfaces)
     5. Barren / Shrubland (Dry soil, scrub, rocky terrain)
 
-    Returns: (terrain_label, greenery_pct, structure_idx)
+    Returns: (terrain_label, greenery_pct, structure_idx, built_ratio)
     """
     if img is None:
-        return "Barren / Shrubland", 0.0, 0.0
+        return "Barren / Shrubland", 0.0, 0.0, 0.0
         
     height, width = img.shape[:2]
     total_pixels = height * width
@@ -96,56 +96,59 @@ def analyze_terrain_metrics(img):
     # 6. Structural Edge & Straight Line Detection (Suppresses organic texture via Gaussian blur)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     edges = cv2.Canny(blurred, 60, 180)
-    edge_ratio = cv2.countNonZero(edges) / total_pixels
-    
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=45, minLineLength=30, maxLineGap=6)
     n_lines = len(lines) if lines is not None else 0
     
     greenery_pct = round(green_ratio * 100.0, 1)
-    structure_idx = round((n_lines / 10.0) + (roof_ratio * 50.0), 2)
+    structure_idx = round((n_lines / 10.0) + (roof_ratio * 50.0) + (built_ratio * 10.0), 2)
 
     # ── Strict Ground-Truth Industry Verification ──
-    # A true industrial facility requires human architecture:
-    # 1. Metallic or concrete building roofs (roof_ratio >= 1.5%)
-    # 2. Built-up paved yards or asphalt pads (built_ratio >= 4%)
-    # 3. Orthogonal linear building edges (n_lines >= 1)
-    has_industry_structures = (
-        (roof_ratio >= 0.015 and built_ratio >= 0.04 and n_lines >= 1) or
-        (built_ratio >= 0.12 and n_lines >= 2) or
-        (n_lines >= 15 and built_ratio >= 0.05) or
-        (roof_ratio >= 0.03)
-    )
+    # Reject dense natural wildland (e.g. Borneo, Amazon, Angola) where clouds or sun glint mimic white roofs
+    is_industry = False
+    if green_ratio < 0.40 or (n_lines >= 8 and built_ratio >= 0.25):
+        # Extreme offshore industrial platform (e.g. Safaniya complex)
+        if water_ratio >= 0.20 and built_ratio >= 0.15:
+            is_industry = True
+        elif (
+            (roof_ratio >= 0.010 and built_ratio >= 0.03 and n_lines >= 1) or
+            (built_ratio >= 0.07 and n_lines >= 2) or
+            (built_ratio >= 0.25) or
+            (roof_ratio >= 0.025 and n_lines >= 1) or
+            (n_lines >= 5 and built_ratio >= 0.03)
+        ):
+            is_industry = True
 
-    if water_ratio > 0.40:
-        return "Water / Offshore", greenery_pct, structure_idx
+    if water_ratio > 0.40 and not is_industry:
+        return "Water / Offshore", greenery_pct, structure_idx, round(built_ratio, 3)
         
-    if has_industry_structures:
-        return "Industry / Factory", greenery_pct, structure_idx
+    if is_industry:
+        return "Industry / Factory", greenery_pct, structure_idx, round(built_ratio, 3)
         
     # If not industry and has vegetation -> Forest Canopy
     if green_ratio >= 0.25:
-        return "Forest Canopy", greenery_pct, structure_idx
+        return "Forest Canopy", greenery_pct, structure_idx, round(built_ratio, 3)
         
     # Crop plots
     if agri_ratio >= 0.25:
-        return "Agricultural Farmland", greenery_pct, structure_idx
+        return "Agricultural Farmland", greenery_pct, structure_idx, round(built_ratio, 3)
         
     # If no industry and open wildland -> Forest / Wildland Canopy
-    return "Forest Canopy", greenery_pct, structure_idx
+    return "Forest Canopy", greenery_pct, structure_idx, round(built_ratio, 3)
 
 def analyze_terrain(img):
     """Backwards-compatible wrapper returning only the terrain label."""
-    terrain, _, _ = analyze_terrain_metrics(img)
+    terrain, _, _, _ = analyze_terrain_metrics(img)
     return terrain
 
 def classify_terrain_from_coordinates(lat, lon, zoom=15):
     """Classifies satellite terrain for a single coordinate."""
     img = get_esri_tile_image(lat, lon, zoom=zoom)
-    terrain, greenery, struct = analyze_terrain_metrics(img)
+    terrain, greenery, struct, built = analyze_terrain_metrics(img)
     return {
         "terrain": terrain,
         "greenery_pct": greenery,
         "structure_idx": struct,
+        "built_ratio": built,
         "tile_url": get_esri_tile_url(lat, lon, zoom=zoom)
     }
 
@@ -206,11 +209,12 @@ def classify_hotspots_terrain_batch_detailed(coords_list, max_workers=20, zoom=1
             except Exception:
                 pass
 
-        terrain, greenery, struct = analyze_terrain_metrics(img)
+        terrain, greenery, struct, built = analyze_terrain_metrics(img)
         return (z, x, y), {
             "satellite_terrain": terrain,
             "vision_greenery": greenery,
             "vision_structure": struct,
+            "vision_built": built,
             "tile_url": tile_url
         }
 
@@ -227,6 +231,7 @@ def classify_hotspots_terrain_batch_detailed(coords_list, max_workers=20, zoom=1
                 "satellite_terrain": "Barren / Shrubland",
                 "vision_greenery": 0.0,
                 "vision_structure": 0.0,
+                "vision_built": 0.0,
                 "tile_url": f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{zoom}/{key[2]}/{key[1]}"
             })
 

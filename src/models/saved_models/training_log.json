@@ -110,5 +110,65 @@
       "3": 842,
       "4": 679
     }
+  },
+  {
+    "timestamp": "2026-09-05T14:42:53.980631",
+    "training_samples": 20000,
+    "feature_cols": [
+      "frp",
+      "brightness",
+      "is_industrial_map",
+      "vision_structure",
+      "vision_greenery",
+      "vision_built",
+      "persistence",
+      "ch4_concentration",
+      "aerosol_index",
+      "day_night",
+      "temperature",
+      "humidity",
+      "wind_speed"
+    ],
+    "class_map": {
+      "0": "Forest Fire",
+      "1": "Industrial Fire",
+      "2": "Persistent Industrial Thermal Source",
+      "3": "Agricultural Burn"
+    },
+    "gradient_boosting": {
+      "test_accuracy": 0.9992,
+      "cv_f1_macro_mean": 0.9989,
+      "cv_f1_macro_std": 0.0006,
+      "hyperparams": {
+        "max_iter": 500,
+        "max_leaf_nodes": 63,
+        "learning_rate": 0.05,
+        "class_weight": "balanced"
+      }
+    },
+    "random_forest": {
+      "test_accuracy": 0.9992,
+      "feature_importances": {
+        "frp": 0.1179,
+        "brightness": 0.0993,
+        "is_industrial_map": 0.1186,
+        "vision_structure": 0.0843,
+        "vision_greenery": 0.0711,
+        "vision_built": 0.1467,
+        "persistence": 0.1522,
+        "ch4_concentration": 0.0802,
+        "aerosol_index": 0.0826,
+        "day_night": 0.0,
+        "temperature": 0.0062,
+        "humidity": 0.005,
+        "wind_speed": 0.0359
+      }
+    },
+    "class_distribution": {
+      "0": 9093,
+      "1": 3977,
+      "2": 3973,
+      "3": 2957
+    }
   }
 ]

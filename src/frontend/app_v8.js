@@ -106,11 +106,11 @@ const CLASS_COLOURS = {
 function mapCategory(originalCls) {
     if (!originalCls) return null;
     const c = originalCls.toLowerCase();
-    if (c.includes('flare') || c.includes('mining') || c.includes('routine')) return 'Persistent Industrial Thermal Source';
-    if (c.includes('wildfire') || c.includes('forest')) return 'Forest Fire';
+    if (c.includes('persistent') || c.includes('flare') || c.includes('routine')) return 'Persistent Industrial Thermal Source';
+    if (c.includes('industrial')) return 'Industrial Fire';
     if (c.includes('agri')) return 'Agricultural Burn';
-    if (c.includes('industrial fire') || c.includes('accidental')) return 'Industrial Fire';
-    return null;
+    if (c.includes('wildfire') || c.includes('forest')) return 'Forest Fire';
+    return originalCls;
 }
 
 /** Risk level → badge colour */
