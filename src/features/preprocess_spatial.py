@@ -104,12 +104,12 @@ def preprocess_and_join():
     zones_path = "data/raw/zones/all_zones_india.geojson"
     
     if not os.path.exists(zones_path):
-        print(f"❌ Zone data not found. Run: python src/data/ingest_land_zones.py")
-        return
-    
-    gdf_zones = gpd.read_file(zones_path)
-    print(f"\n🌍 Loaded {len(gdf_zones)} land zones from {os.path.basename(zones_path)}")
-    
+        print(f"⚠️ Zone data not found. All hotspots will be marked unknown.")
+        gdf_zones = gpd.GeoDataFrame()
+    else:
+        gdf_zones = gpd.read_file(zones_path)
+        print(f"\n🌍 Loaded {len(gdf_zones)} land zones from {os.path.basename(zones_path)}")
+        
     if gdf_zones.empty:
         print("⚠️  Land zone data is empty. All hotspots will be marked unknown.")
         gdf_firms['is_industrial'] = False

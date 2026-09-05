@@ -24,16 +24,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 FIRMS_API_BASE = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
-BBOX = "68,8,97,37"
+AREA = "world"
 GRID_SIZE_DEG = 0.01  # ~1.1 km grid for matching
 
 
-def fetch_historical_for_persistence(api_key: str, days: int = 30) -> pd.DataFrame:
+def fetch_historical_for_persistence(api_key: str, days: int = 1) -> pd.DataFrame:
     """
-    Download 30-day FIRMS history for persistence computation.
-    Uses VIIRS-SNPP as the most consistent long-running sensor.
+    Download FIRMS data for persistence computation.
+    Capped at 1 day for global feed to prevent large payload timeouts.
     """
-    url = f"{FIRMS_API_BASE}/{api_key}/VIIRS_SNPP_NRT/{BBOX}/{min(days, 30)}"
+    url = f"{FIRMS_API_BASE}/{api_key}/VIIRS_SNPP_NRT/{AREA}/{min(days, 1)}"
     print(f"Fetching {days}-day FIRMS history for persistence analysis...")
     
     try:

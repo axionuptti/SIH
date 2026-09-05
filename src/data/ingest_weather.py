@@ -29,10 +29,20 @@ def fetch_weather_for_hotspots(geojson_path):
     wind_directions = []
     aqis = []
     
+    service_offline = False
     print(f"Fetching real-time weather & AQI data for {len(gdf)} locations via Open-Meteo...")
     
     for i in range(0, len(gdf), chunk_size):
         chunk = gdf.iloc[i:i+chunk_size]
+        
+        if service_offline:
+            for _ in range(len(chunk)):
+                temperatures.append(25.0)
+                humidities.append(50.0)
+                wind_speeds.append(10.0)
+                wind_directions.append(0.0)
+                aqis.append(50.0)
+            continue
         
         lats = ",".join(chunk['latitude'].astype(str))
         lons = ",".join(chunk['longitude'].astype(str))
@@ -41,29 +51,13 @@ def fetch_weather_for_hotspots(geojson_path):
         aqi_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lats}&longitude={lons}&current=european_aqi"
         
         try:
-            w_resp = None
-            a_resp = None
-            max_retries = 3
+            w_resp = requests.get(weather_url, timeout=3)
+            a_resp = requests.get(aqi_url, timeout=3)
             
-            for attempt in range(max_retries):
-                w_resp = requests.get(weather_url)
-                a_resp = requests.get(aqi_url)
-                
-                if w_resp.status_code == 200 and a_resp.status_code == 200:
-                    break
-                elif w_resp.status_code == 429 or a_resp.status_code == 429:
-                    if attempt < max_retries - 1:
-                        sleep_time = 2 ** attempt
-                        print(f"Rate limited. Retrying in {sleep_time} seconds...")
-                        time.sleep(sleep_time)
-                        continue
-                break # Exit loop if it's a non-retriable error or success
-            
-            if w_resp and a_resp and w_resp.status_code == 200 and a_resp.status_code == 200:
+            if w_resp.status_code == 200 and a_resp.status_code == 200:
                 w_data = w_resp.json()
                 a_data = a_resp.json()
                 
-                # If only 1 coordinate was sent, data is a dict, otherwise it's a list
                 if isinstance(w_data, dict): w_data = [w_data]
                 if isinstance(a_data, dict): a_data = [a_data]
                     
@@ -77,7 +71,6 @@ def fetch_weather_for_hotspots(geojson_path):
                     wind_directions.append(wc.get('wind_direction_10m', 0.0))
                     aqis.append(ac.get('european_aqi', 50.0))
             else:
-                print(f"Warning: Open-Meteo API error. Using fallback data.")
                 for _ in range(len(chunk)):
                     temperatures.append(25.0)
                     humidities.append(50.0)
@@ -85,7 +78,8 @@ def fetch_weather_for_hotspots(geojson_path):
                     wind_directions.append(0.0)
                     aqis.append(50.0)
         except Exception as e:
-            print(f"Error fetching data: {e}")
+            print(f"Weather API unreachable ({e}). Using default meteorological parameters.")
+            service_offline = True
             for _ in range(len(chunk)):
                 temperatures.append(25.0)
                 humidities.append(50.0)

@@ -26,7 +26,7 @@ FEATURE_COLS = [
 
 def train_model():
     print("=" * 60)
-    print("Geo-AI Fire Sentinel — Model Training")
+    print("Fire detection AI — Model Training")
     print("=" * 60)
     
     # 1. Load Training Data

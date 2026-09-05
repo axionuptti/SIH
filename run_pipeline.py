@@ -16,7 +16,6 @@ Default (no flags): Fast mode — re-fetches FIRMS + weather, re-runs inference 
 
 Pipeline stages:
     Stage 1: Fetch FIRMS data (VIIRS SNPP + NOAA-20 + MODIS)
-    Stage 2: [Optional] Fetch land zones (National Parks, Forests, etc.)
     Stage 3: Preprocess & spatial join
     Stage 4: Enrich with weather + AQI (Open-Meteo)
     Stage 5: Compute 30-day persistence scores
@@ -89,41 +88,29 @@ def run_pipeline(full: bool = False, skip_osm: bool = False, skip_train: bool = 
     pipeline_start = time.time()
     failed_stages = []
 
-    # ── Stage 1: FIRMS Multi-Source Ingestion ────────────────────────────────
+    # ── Stage 1: FIRMS + INSAT Multi-Source Ingestion ────────────────────────────────
     from src.data.ingest_firms import fetch_firms_data, merge_multi_source, SOURCES
+    from src.data.ingest_insat import fetch_insat_3d_data
+    
     def _stage1():
         dfs = {}
         for source in SOURCES:
-            dfs[source] = fetch_firms_data(api_key, source=source, days=1)
+            if source == "INSAT_3D_NRT":
+                dfs[source] = fetch_insat_3d_data()
+            else:
+                dfs[source] = fetch_firms_data(api_key, source=source, days=2)
+                
         merged = merge_multi_source(dfs)
         if not merged.empty:
             from datetime import datetime as dt
-            out = f"data/raw/firms_merged_{dt.now().strftime('%Y%m%d')}.csv"
+            out = f"data/raw/satellite_merged_{dt.now().strftime('%Y%m%d')}.csv"
             merged.to_csv(out, index=False)
             log(f"Merged {len(merged)} hotspots saved to {out}", "OK")
         else:
-            raise RuntimeError("No FIRMS data returned from any source")
+            raise RuntimeError("No satellite data returned from any source")
 
-    if not stage(1, "Multi-Source FIRMS Ingestion (VIIRS SNPP + NOAA-20 + MODIS)", _stage1):
+    if not stage(1, "Multi-Source Ingestion (VIIRS + MODIS + INSAT)", _stage1):
         failed_stages.append(1)
-
-    # ── Stage 2: Land Zones (Optional / Slow) ───────────────────────────────
-    zones_file = "data/raw/zones/all_zones_india.geojson"
-    if full and not skip_osm:
-        def _run_land_zones():
-            import subprocess
-            subprocess.run([sys.executable, "src/data/ingest_land_zones.py"], check=True)
-        if not stage(2, "Land Zone Ingestion", _run_land_zones):
-            failed_stages.append(2)
-    elif os.path.exists(zones_file):
-        log("Stage 2: Land Zones — using existing dataset (skip with no --full)", "INFO")
-    else:
-        log("Stage 2: Land Zones — file not found, building curated zones...", "WARN")
-        def _run_land_zones():
-            import subprocess
-            subprocess.run([sys.executable, "src/data/ingest_land_zones.py"], check=True)
-        if not stage(2, "Land Zone Build", _run_land_zones):
-            failed_stages.append(2)
 
     # ── Stage 3: Spatial Preprocessing & Confidence Filter ───────────────────
     from src.features.preprocess_spatial import preprocess_and_join

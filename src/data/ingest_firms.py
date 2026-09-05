@@ -7,33 +7,32 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # NASA FIRMS API Base URL
+# NASA FIRMS API Base URL
 FIRMS_API_BASE = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
 FIRMS_HIST_BASE = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
 
-# India Bounding Box (West, South, East, North)
-BBOX = "68,8,97,37"
+# Global Coverage Area
+AREA = "world"
 
-# Multi-source configuration — each adds complementary detection capability
+# Threshold for heavy/intense fires (in Megawatts of Fire Radiative Power)
+HEAVY_FIRE_MIN_FRP = 25.0
+
+# Multi-source configuration — global high-resolution satellite sensors
 SOURCES = {
-    "VIIRS_SNPP_NRT":   {"resolution": "375m", "priority": 1, "desc": "Suomi-NPP VIIRS (primary, 375m)"},
-    "VIIRS_NOAA20_NRT": {"resolution": "375m", "priority": 2, "desc": "NOAA-20 VIIRS (cross-validation, 375m)"},
-    "MODIS_NRT":        {"resolution": "1km",  "priority": 3, "desc": "Terra/Aqua MODIS (broader coverage, 1km)"},
+    "VIIRS_SNPP_NRT":   {"resolution": "375m", "priority": 1, "desc": "Suomi-NPP VIIRS (global, 375m)"},
+    "VIIRS_NOAA20_NRT": {"resolution": "375m", "priority": 2, "desc": "NOAA-20 VIIRS (global, 375m)"},
 }
 
-def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=1):
+def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=1, min_frp=HEAVY_FIRE_MIN_FRP):
     """
-    Fetch active fire / thermal anomaly data from NASA FIRMS NRT API.
-    
-    Sources:
-        VIIRS_SNPP_NRT    — 375m, Suomi-NPP (primary)
-        VIIRS_NOAA20_NRT  — 375m, NOAA-20 (provides ~6h offset, doubles coverage)
-        MODIS_NRT         — 1km, Terra+Aqua (wider FOV, catches large events)
+    Fetch active fire / thermal anomaly data from NASA FIRMS NRT API for the entire globe.
+    Filters specifically for heavy fires (FRP >= min_frp).
     """
-    url = f"{FIRMS_API_BASE}/{api_key}/{source}/{BBOX}/{days}"
-    print(f"  Fetching {SOURCES.get(source, {}).get('desc', source)}...")
+    url = f"{FIRMS_API_BASE}/{api_key}/{source}/{AREA}/{days}"
+    print(f"  Fetching global {SOURCES.get(source, {}).get('desc', source)}...")
     
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=45)
         
         if response.status_code == 429 or "rate limit" in response.text.lower():
             print(f"  ⚠️  RATE LIMIT REACHED for {source}. NASA API limits exceeded.")
@@ -44,13 +43,20 @@ def fetch_firms_data(api_key, source="VIIRS_SNPP_NRT", days=1):
                 print(f"  ⚠️  FIRMS returned error or empty response for {source}: {response.text[:100]}")
                 return None
             
+            import io
+            df = pd.read_csv(io.StringIO(response.text))
+            raw_count = len(df)
+            
+            # Filter specifically for heavy fires
+            if 'frp' in df.columns:
+                df['frp'] = pd.to_numeric(df['frp'], errors='coerce').fillna(0)
+                df = df[df['frp'] >= min_frp].copy()
+            
             os.makedirs("data/raw", exist_ok=True)
             file_path = f"data/raw/firms_{source}_{datetime.now().strftime('%Y%m%d')}.csv"
-            with open(file_path, 'w') as f:
-                f.write(response.text)
+            df.to_csv(file_path, index=False)
             
-            df = pd.read_csv(file_path)
-            print(f"  ✅ {source}: {len(df)} hotspots (saved to {os.path.basename(file_path)})")
+            print(f"  ✅ {source}: {len(df)} heavy fires retained (from {raw_count} global anomalies, FRP ≥ {min_frp} MW)")
             return df
         else:
             print(f"  ❌ HTTP {response.status_code} for {source}: {response.text[:100]}")
@@ -66,8 +72,8 @@ def fetch_firms_historical(api_key, source="VIIRS_SNPP_NRT", days_back=30):
     Returns the last `days_back` days of data for computing recurrence.
     Limited to 30 days per the free FIRMS API tier.
     """
-    days = min(days_back, 30)  # FIRMS API max is 30 days for free tier
-    url = f"{FIRMS_HIST_BASE}/{api_key}/{source}/{BBOX}/{days}"
+    days = min(days_back, 1)  # Limited for global feed
+    url = f"{FIRMS_HIST_BASE}/{api_key}/{source}/{AREA}/{days}"
     print(f"  Fetching {days}-day historical data from {source} for persistence analysis...")
     
     try:
