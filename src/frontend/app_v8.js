@@ -19,25 +19,26 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 
 const map = L.map('map', {
     zoomControl: false,
-    minZoom: 1.0, // Allow viewing whole planet smoothly on any monitor
-    maxBounds: [[-85, -180], [85, 180]], // Restrict panning to Earth
-    maxBoundsViscosity: 0.6,
-    zoomSnap: 0.25, // Snaps smoothly to fit any screen aspect ratio perfectly
+    minZoom: 2.75, // Zoomed in enough so satellite imagery covers 100% of canvas with NO "Map data not available"
+    maxZoom: 18,
+    maxBounds: [[-62, -220], [70, 220]], // Confines view to inhabited regions; blocks polar "no data" tiles
+    maxBoundsViscosity: 0.9,
+    zoomSnap: 0.1, // Smooth fractional zoom
     zoomDelta: 0.5,
     closePopupOnClick: false // Prevents clicks on map from closing popups!
-});
+}).setView([20.0, 15.0], 2.9);
 map.options.closePopupOnClick = false;
 
-// Satellite base layer
+// Satellite base layer (seamless wrapping to cover entire canvas edge-to-edge)
 const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles &copy; Esri', noWrap: true }
+    { attribution: 'Tiles &copy; Esri', maxZoom: 19 }
 ).addTo(map);
 
 // Dark map overlay for hybrid view (contains the map text/labels)
 const darkOverlay = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-    { attribution: '&copy; CartoDB', opacity: 0.6, noWrap: true }
+    { attribution: '&copy; CartoDB', opacity: 0.65, maxZoom: 19 }
 ).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -1121,12 +1122,9 @@ window.toggleAnalyticsDrawer = function(forceOpen) {
 window.fitMapToFrame = function(animate = true) {
     if (typeof map === 'undefined' || !map) return;
     map.invalidateSize();
-    // Seamlessly fit the populated global landmasses into whatever the frame dimensions are
-    map.fitBounds([[-52, -165], [68, 175]], {
-        padding: [15, 15],
-        animate: animate,
-        maxZoom: 3.5
-    });
+    // Zoom in so that satellite imagery completely covers the entire canvas of the map
+    // without ever displaying polar regions or "Map data not available" tiles
+    map.setView([20.0, 15.0], 2.9, { animate: animate });
 };
 
 window.resetWorldView = function() {
