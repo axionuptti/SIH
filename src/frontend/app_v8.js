@@ -19,13 +19,13 @@ const worldBounds = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
 
 const map = L.map('map', {
     zoomControl: false,
-    minZoom: 2, // Allow viewing whole planet
+    minZoom: 1.5, // Allow viewing whole planet smoothly
     maxBounds: worldBounds, // Restrict panning to a single Earth
     maxBoundsViscosity: 0.8, // Smooth bounds
-    zoomSnap: 1, // Snaps to integer zoom levels to eliminate fractional sub-pixel tile misalignment
-    zoomDelta: 1,
+    zoomSnap: 0.5, // Snaps smoothly to fit any screen aspect ratio
+    zoomDelta: 0.5,
     closePopupOnClick: false // Prevents clicks on map from closing popups!
-}).setView([20.0, 0.0], 2);
+}).setView([18.0, 15.0], 2);
 map.options.closePopupOnClick = false;
 
 // Satellite base layer
@@ -1001,14 +1001,15 @@ function loadFireHistoryChart() {
 // ─── Most Active Global Fire Zones ──────────────────────────────────────────
 window.focusFireZone = function(lat, lon) {
     if (!map) return;
+    // If in full map mode and drawer is open, automatically minimize it so the user can view the focused zone!
+    const container = document.getElementById('analytics-deck');
+    if (container && container.classList.contains('drawer-open')) {
+        window.toggleAnalyticsDrawer(false);
+    }
     map.flyTo([lat, lon], 5, {
         animate: true,
         duration: 1.5
     });
-    const mapWrapper = document.querySelector('.map-wrapper');
-    if (mapWrapper) {
-        mapWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 };
 
 function loadActiveFireZones() {
@@ -1068,12 +1069,72 @@ loadData();
 loadFireHistoryChart();
 loadActiveFireZones();
 
-// Adjust map tiles to compact layout size
+// ─── View Mode Switching & Analytics Drawer ──────────────────────────────────
+window.switchViewMode = function(mode) {
+    const deck = document.querySelector('.main-content-deck');
+    const btnFull = document.getElementById('btn-mode-full');
+    const btnSplit = document.getElementById('btn-mode-split');
+    const container = document.getElementById('analytics-deck');
+    
+    if (mode === 'split') {
+        if (deck) deck.classList.add('split-mode');
+        if (container) container.classList.remove('drawer-open');
+        if (btnFull) btnFull.classList.remove('active');
+        if (btnSplit) btnSplit.classList.add('active');
+    } else {
+        if (deck) deck.classList.remove('split-mode');
+        if (container) container.classList.remove('drawer-open');
+        if (btnFull) btnFull.classList.add('active');
+        if (btnSplit) btnSplit.classList.remove('active');
+    }
+    
+    // Invalidate Leaflet map size during transition
+    const interval = setInterval(() => map.invalidateSize(), 25);
+    setTimeout(() => {
+        clearInterval(interval);
+        map.invalidateSize();
+    }, 450);
+};
+
+window.toggleAnalyticsDrawer = function(forceOpen) {
+    const container = document.getElementById('analytics-deck');
+    const chevron = document.getElementById('dock-chevron-icon');
+    if (!container) return;
+    
+    const isOpen = (typeof forceOpen === 'boolean') 
+        ? forceOpen 
+        : !container.classList.contains('drawer-open');
+        
+    if (isOpen) {
+        container.classList.add('drawer-open');
+        if (chevron) chevron.innerText = '▼';
+    } else {
+        container.classList.remove('drawer-open');
+        if (chevron) chevron.innerText = '▲';
+    }
+};
+
+window.resetWorldView = function() {
+    map.invalidateSize();
+    map.setView([18.0, 15.0], 2, { animate: true });
+};
+
+// Window resize listener
+window.addEventListener('resize', () => {
+    if (typeof map !== 'undefined') map.invalidateSize();
+});
+
+// Adjust map tiles to full frame size
 setTimeout(() => {
     if (typeof map !== 'undefined') {
         map.invalidateSize();
     }
-}, 150);
+}, 100);
+setTimeout(() => {
+    if (typeof map !== 'undefined') {
+        map.invalidateSize();
+    }
+}, 500);
 
 // ─── Right Panel Toggle ───────────────────────────────────────────────────────
 window.toggleRightPanel = function() {

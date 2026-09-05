@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style_v8.css?v=36">
+    <link rel="stylesheet" href="style_v8.css?v=37">
 </head>
 <body>
 
@@ -211,21 +211,46 @@
             </footer>
         </aside>
 
-        <!-- Main Content Area: Compact Map + Analytics Intelligence Deck -->
+        <!-- Main Content Area: Full Frame Map + Slide-Up/Split Analytics Intelligence Deck -->
         <div class="main-content-deck">
-            <!-- 1. Compact High-Tech Map Section -->
+            <!-- 1. Full-Size Map Section -->
             <main class="map-wrapper glass-panel" style="position: relative;">
                 <div id="map"></div>
                 
                 <!-- Floating Top Bar overlay on map -->
                 <div class="floating-header glass-panel">
                     <div class="location-info">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                         <span>SIH26162 · Real-Time Satellite AI</span>
                     </div>
                     <div class="time-info">
                         <span id="current-time">Live Feed Syncing...</span>
                     </div>
+
+                    <!-- Mode Switcher -->
+                    <div class="view-mode-pill-group">
+                        <button id="btn-mode-full" class="mode-pill-btn active" onclick="window.switchViewMode('full')">
+                            🗺️ Full Map
+                        </button>
+                        <button id="btn-mode-split" class="mode-pill-btn" onclick="window.switchViewMode('split')">
+                            📊 Split View
+                        </button>
+                    </div>
+
+                    <!-- Reset / Fit World Button -->
+                    <button class="mode-pill-btn" onclick="window.resetWorldView()" title="Fit World Map to Frame">
+                        <span>🌐 Fit World</span>
+                    </button>
+                </div>
+
+                <!-- Floating Bottom Dock: Analytics Drawer Trigger on Map -->
+                <div class="map-bottom-dock">
+                    <button id="dock-analytics-btn" class="dock-pill-btn glass-panel" onclick="window.toggleAnalyticsDrawer()">
+                        <span class="dock-pulse-dot"></span>
+                        <span style="font-weight: 600;">📈 Fire History & Active Zones</span>
+                        <span class="dock-pill-badge" id="dock-zones-badge">8 Hubs</span>
+                        <span id="dock-chevron-icon" class="dock-chevron">▲</span>
+                    </button>
                 </div>
 
                 <!-- Button to open right panel -->
@@ -239,58 +264,70 @@
                 </button>
             </main>
 
-            <!-- 2. Lower Analytical Intelligence Deck -->
-            <section class="analytics-deck-container">
-                <!-- Card A: Global Fire History Analysis Graph -->
-                <div class="deck-card glass-panel fire-history-card">
-                    <div class="deck-card-header">
-                        <div class="card-title-group">
-                            <span class="card-icon">📈</span>
-                            <div>
-                                <h3>Global Fire History & Temporal Scan</h3>
-                                <p class="card-subtitle">Multi-satellite temporal trend across world coordinates (Aug 24 – Sep 05)</p>
-                            </div>
-                        </div>
-                        <div class="chart-metric-pills">
-                            <span class="metric-badge"><span class="dot red"></span> Industrial</span>
-                            <span class="metric-badge"><span class="dot orange"></span> Forest</span>
-                            <span class="metric-badge"><span class="dot yellow"></span> Agri</span>
-                            <span class="metric-badge"><span class="dot cyan"></span> FRP (MW)</span>
-                        </div>
+            <!-- 2. Analytical Intelligence Deck (Drawer or Split Mode) -->
+            <section id="analytics-deck" class="analytics-deck-container">
+                <div class="drawer-header-bar">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">📊</span>
+                        <span style="font-size: 0.88rem; font-weight: 700; color: #f8fafc; letter-spacing: 0.4px;">Global Fire Intelligence & Regional Hubs</span>
                     </div>
-                    <div class="history-chart-wrapper">
-                        <canvas id="fireHistoryChart"></canvas>
-                    </div>
-                    <div class="history-stats-ribbon">
-                        <div class="ribbon-item">
-                            <span class="ribbon-lbl">Peak Detection Volume</span>
-                            <span class="ribbon-val" id="hist-peak-vol">776 Fires</span>
-                        </div>
-                        <div class="ribbon-item">
-                            <span class="ribbon-lbl">Average Radiative Power</span>
-                            <span class="ribbon-val" id="hist-avg-frp">60.7 MW</span>
-                        </div>
-                        <div class="ribbon-item">
-                            <span class="ribbon-lbl">Monitored Multi-Day Total</span>
-                            <span class="ribbon-val" id="hist-total-fires">1,894 Hotspots</span>
-                        </div>
-                    </div>
+                    <button class="drawer-close-btn" onclick="window.toggleAnalyticsDrawer(false)">
+                        ✕ Minimize to Map
+                    </button>
                 </div>
 
-                <!-- Card B: Most Active Fire Zones Worldwide -->
-                <div class="deck-card glass-panel active-zones-card">
-                    <div class="deck-card-header">
-                        <div class="card-title-group">
-                            <span class="card-icon">🌍</span>
-                            <div>
-                                <h3>Most Active Global Fire Zones</h3>
-                                <p class="card-subtitle">Ranked by thermal density, radiative power & industrial risk</p>
+                <div class="drawer-cards-grid">
+                    <!-- Card A: Global Fire History Analysis Graph -->
+                    <div class="deck-card glass-panel fire-history-card">
+                        <div class="deck-card-header">
+                            <div class="card-title-group">
+                                <span class="card-icon">📈</span>
+                                <div>
+                                    <h3>Global Fire History & Temporal Scan</h3>
+                                    <p class="card-subtitle">Multi-satellite temporal trend across world coordinates (Aug 24 – Sep 05)</p>
+                                </div>
+                            </div>
+                            <div class="chart-metric-pills">
+                                <span class="metric-badge"><span class="dot red"></span> Industrial</span>
+                                <span class="metric-badge"><span class="dot orange"></span> Forest</span>
+                                <span class="metric-badge"><span class="dot yellow"></span> Agri</span>
+                                <span class="metric-badge"><span class="dot cyan"></span> FRP (MW)</span>
                             </div>
                         </div>
-                        <span class="zones-count-pill" id="active-zones-badge">8 Monitored Hubs</span>
+                        <div class="history-chart-wrapper">
+                            <canvas id="fireHistoryChart"></canvas>
+                        </div>
+                        <div class="history-stats-ribbon">
+                            <div class="ribbon-item">
+                                <span class="ribbon-lbl">Peak Detection Volume</span>
+                                <span class="ribbon-val" id="hist-peak-vol">776 Fires</span>
+                            </div>
+                            <div class="ribbon-item">
+                                <span class="ribbon-lbl">Average Radiative Power</span>
+                                <span class="ribbon-val" id="hist-avg-frp">60.7 MW</span>
+                            </div>
+                            <div class="ribbon-item">
+                                <span class="ribbon-lbl">Monitored Multi-Day Total</span>
+                                <span class="ribbon-val" id="hist-total-fires">1,894 Hotspots</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="zones-list-container" id="active-zones-list">
-                        <div style="color:#94a3b8; font-size:0.8rem; text-align:center; padding:20px;">Analyzing global fire clusters...</div>
+
+                    <!-- Card B: Most Active Fire Zones Worldwide -->
+                    <div class="deck-card glass-panel active-zones-card">
+                        <div class="deck-card-header">
+                            <div class="card-title-group">
+                                <span class="card-icon">🌍</span>
+                                <div>
+                                    <h3>Most Active Global Fire Zones</h3>
+                                    <p class="card-subtitle">Ranked by thermal density, radiative power & industrial risk</p>
+                                </div>
+                            </div>
+                            <span class="zones-count-pill" id="active-zones-badge">8 Monitored Hubs</span>
+                        </div>
+                        <div class="zones-list-container" id="active-zones-list">
+                            <div style="color:#94a3b8; font-size:0.8rem; text-align:center; padding:20px;">Analyzing global fire clusters...</div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -372,6 +409,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom JS -->
-    <script src="app_v8.js?v=36"></script>
+    <script src="app_v8.js?v=37"></script>
 </body>
 </html>

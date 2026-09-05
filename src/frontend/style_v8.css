@@ -917,44 +917,242 @@ body {
 }
 
 /* ==========================================================================
-   Compact Map & Analytics Intelligence Deck Layout
+   Full Size Map & Analytics Intelligence Deck Layout
    ========================================================================== */
 .main-content-deck {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 16px;
     height: 100%;
-    overflow-y: auto;
-    padding-right: 4px;
-}
-.main-content-deck::-webkit-scrollbar {
-    width: 6px;
-}
-.main-content-deck::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    gap: 0;
 }
 
-/* Compact Map: smaller and structured */
+/* Full Size Map in Frame */
 .map-wrapper {
-    height: 460px;
-    min-height: 420px;
-    max-height: 500px;
-    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
+    flex: 1 1 100%;
     position: relative;
     overflow: hidden;
     border-radius: 20px;
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+    transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+#map {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    background: transparent !important;
+}
+
+/* Mode Switch Pills in Floating Header */
+.view-mode-pill-group {
+    display: flex;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.mode-pill-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mode-pill-btn:hover {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.mode-pill-btn.active {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+/* Bottom Floating Dock on Map */
+.map-bottom-dock {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.dock-pill-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-radius: 30px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #f8fafc;
+    font-size: 0.82rem;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.15);
+    transition: all 0.25s ease;
+    background: rgba(15, 23, 42, 0.85);
+}
+
+.dock-pill-btn:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(56, 189, 248, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 25px rgba(56, 189, 248, 0.3);
+}
+
+.dock-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px #38bdf8;
+    animation: alertPulse 2s infinite alternate;
+}
+
+.dock-pill-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    padding: 2px 7px;
+    border-radius: 10px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.dock-chevron {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    transition: transform 0.3s;
+}
+
+/* Analytics Drawer (Overlays bottom of map smoothly) */
 .analytics-deck-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    background: rgba(10, 15, 26, 0.94);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border-top: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.7);
+    padding: 16px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 480px;
+    transform: translateY(105%);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.analytics-deck-container.drawer-open {
+    transform: translateY(0%);
+}
+
+.drawer-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.drawer-close-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #94a3b8;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.drawer-close-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.drawer-cards-grid {
     display: grid;
     grid-template-columns: 1.25fr 0.95fr;
     gap: 16px;
-    min-height: 390px;
-    margin-bottom: 12px;
-    flex-shrink: 0;
+    overflow-y: auto;
+    max-height: 400px;
+    padding-right: 4px;
+}
+.drawer-cards-grid::-webkit-scrollbar {
+    width: 6px;
+}
+.drawer-cards-grid::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+}
+
+/* Split View Mode when activated */
+.main-content-deck.split-mode {
+    overflow-y: auto;
+    gap: 16px;
+}
+
+.main-content-deck.split-mode .map-wrapper {
+    height: 480px;
+    min-height: 420px;
+    flex: none;
+}
+
+.main-content-deck.split-mode .analytics-deck-container {
+    position: static;
+    transform: none;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    max-height: none;
+    margin-bottom: 16px;
+}
+
+.main-content-deck.split-mode .map-bottom-dock {
+    display: none;
+}
+.main-content-deck.split-mode .drawer-header-bar {
+    display: none;
+}
+.main-content-deck.split-mode .drawer-cards-grid {
+    max-height: none;
+    overflow-y: visible;
 }
 
 .deck-card {
