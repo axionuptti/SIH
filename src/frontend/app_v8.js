@@ -1072,48 +1072,59 @@ window.toggleEvacPlan = function(btn, lat, lon, frp, cls) {
     }
 };
 
-// ─── Global Fire History Graph (World Map Analysis) ────────────────────────
+// ─── Global Heating Zones Graph (World Map Analysis) ────────────────────────
 let fireHistoryChartInstance = null;
+
+function getShortZoneName(name) {
+    if (!name) return 'Zone';
+    if (name.includes('Congo')) return 'Congo Basin';
+    if (name.includes('Zambezi') || name.includes('Mozambique')) return 'Zambezi Basin';
+    if (name.includes('Amazon') || name.includes('Mato Grosso')) return 'Amazon Arc';
+    if (name.includes('Kalahari') || name.includes('Namibia')) return 'Kalahari Fringe';
+    if (name.includes('Indonesian') || name.includes('Borneo') || name.includes('Palm')) return 'Indonesia Peat';
+    if (name.includes('Rift Valley') || name.includes('East Africa')) return 'East Africa Rift';
+    if (name.includes('Russian') || name.includes('Russia')) return 'Russia Boreal';
+    if (name.includes('Ukraine')) return 'Ukraine Front';
+    if (name.includes('Persian Gulf') || name.includes('Mesopotamian')) return 'Persian Gulf';
+    if (name.includes('Australia')) return 'Australia Bush';
+    if (name.includes('North America') || name.includes('Canada') || name.includes('United States')) return 'North America';
+    return name.replace(' Hotspot Zone', '').split(' ')[0] + ' Hub';
+}
+
 function loadFireHistoryChart() {
-    fetch('/api/analytics/history')
+    fetch('/api/analytics/zones')
         .then(r => r.json())
-        .then(data => {
-            if (!Array.isArray(data) || data.length === 0) return;
+        .then(zones => {
+            if (!Array.isArray(zones) || zones.length === 0) return;
             const ctx = document.getElementById('fireHistoryChart');
             if (!ctx) return;
 
-            // Format labels: 'Aug 24', 'Aug 25', ..., 'Sep 05'
-            const labels = data.map(d => {
-                const parts = d.date.split('-');
-                const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            });
-
-            const industrialData = data.map(d => d.industrial);
-            const forestData = data.map(d => d.forest);
-            const agriData = data.map(d => d.agri);
-            const frpData = data.map(d => d.avg_frp);
+            const labels = zones.map(z => getShortZoneName(z.zone_name));
+            const industrialData = zones.map(z => z.industrial_fires || 0);
+            const forestData = zones.map(z => z.forest_fires || 0);
+            const agriData = zones.map(z => z.agri_fires || 0);
+            const persistentData = zones.map(z => z.persistent_sources || 0);
+            const peakFrpData = zones.map(z => z.max_frp || 0);
 
             // Calculate KPIs
-            const totalHotspots = data.reduce((acc, d) => acc + d.total, 0);
-            const peakItem = data.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), data[0]);
-            const peakIdx = data.indexOf(peakItem);
-            const peakDateStr = peakIdx >= 0 ? labels[peakIdx] : '';
-            const overallAvgFrp = (data.reduce((acc, d) => acc + (d.avg_frp * d.total), 0) / Math.max(totalHotspots, 1)).toFixed(1);
+            const highestFrpZone = zones.reduce((prev, curr) => ((curr.max_frp || 0) > (prev.max_frp || 0) ? curr : prev), zones[0]);
+            const densestZone = zones.reduce((prev, curr) => ((curr.total_fires || 0) > (prev.total_fires || 0) ? curr : prev), zones[0]);
+            const totalHubFires = zones.reduce((acc, z) => acc + (z.total_fires || 0), 0);
 
             const peakEl = document.getElementById('hist-peak-vol');
-            if (peakEl) peakEl.innerText = `${peakItem.total} Fires (${peakDateStr})`;
+            if (peakEl) peakEl.innerText = `${highestFrpZone.max_frp} MW (${getShortZoneName(highestFrpZone.zone_name)})`;
             const avgEl = document.getElementById('hist-avg-frp');
-            if (avgEl) avgEl.innerText = `${overallAvgFrp} MW`;
+            if (avgEl) avgEl.innerText = `${densestZone.total_fires.toLocaleString()} Fires (${getShortZoneName(densestZone.zone_name)})`;
             const totEl = document.getElementById('hist-total-fires');
-            if (totEl) totEl.innerText = `${totalHotspots.toLocaleString()} Hotspots`;
+            if (totEl) totEl.innerText = `${totalHubFires.toLocaleString()} Fires (${zones.length} Hubs)`;
 
             if (fireHistoryChartInstance) {
                 fireHistoryChartInstance.data.labels = labels;
                 fireHistoryChartInstance.data.datasets[0].data = industrialData;
                 fireHistoryChartInstance.data.datasets[1].data = forestData;
                 fireHistoryChartInstance.data.datasets[2].data = agriData;
-                fireHistoryChartInstance.data.datasets[3].data = frpData;
+                fireHistoryChartInstance.data.datasets[3].data = persistentData;
+                fireHistoryChartInstance.data.datasets[4].data = peakFrpData;
                 fireHistoryChartInstance.update();
                 return;
             }
@@ -1148,15 +1159,24 @@ function loadFireHistoryChart() {
                             order: 2
                         },
                         {
-                            label: 'Mean FRP (MW)',
-                            data: frpData,
+                            label: 'Persistent Industrial',
+                            data: persistentData,
+                            backgroundColor: 'rgba(56, 189, 248, 0.75)',
+                            borderRadius: 4,
+                            stack: 'fires',
+                            order: 2
+                        },
+                        {
+                            label: 'Peak FRP (MW)',
+                            data: peakFrpData,
                             type: 'line',
-                            borderColor: '#38bdf8',
-                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            borderColor: '#c084fc',
+                            backgroundColor: 'rgba(192, 132, 252, 0.12)',
                             borderWidth: 2.5,
-                            pointBackgroundColor: '#38bdf8',
-                            pointRadius: 3.5,
-                            tension: 0.35,
+                            pointBackgroundColor: '#c084fc',
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.3,
                             yAxisID: 'yFrp',
                             order: 1
                         }
@@ -1165,6 +1185,20 @@ function loadFireHistoryChart() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (evt, elements) => {
+                        if (elements && elements.length > 0) {
+                            const idx = elements[0].index;
+                            const z = zones[idx];
+                            if (z && z.center_lat && z.center_lon) {
+                                window.focusFireZone(z.center_lat, z.center_lon);
+                            }
+                        }
+                    },
+                    onHover: (evt, elements) => {
+                        if (evt && evt.native && evt.native.target) {
+                            evt.native.target.style.cursor = (elements && elements.length) ? 'pointer' : 'default';
+                        }
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false
@@ -1175,38 +1209,65 @@ function loadFireHistoryChart() {
                             backgroundColor: 'rgba(15, 23, 42, 0.95)',
                             titleFont: { family: 'Outfit', size: 13, weight: 'bold' },
                             bodyFont: { family: 'Outfit', size: 12 },
-                            padding: 10,
+                            padding: 12,
                             cornerRadius: 8,
-                            borderColor: 'rgba(255, 255, 255, 0.12)',
-                            borderWidth: 1
+                            borderColor: 'rgba(56, 189, 248, 0.3)',
+                            borderWidth: 1,
+                            callbacks: {
+                                title: (tooltipItems) => {
+                                    const idx = tooltipItems[0].dataIndex;
+                                    const z = zones[idx];
+                                    return `${z.zone_name} (${z.region})`;
+                                },
+                                afterBody: (tooltipItems) => {
+                                    const idx = tooltipItems[0].dataIndex;
+                                    const z = zones[idx];
+                                    const lines = [
+                                        `─────────────────────────`,
+                                        `🔥 Total Active Fires: ${z.total_fires.toLocaleString()}`,
+                                        `⚡ Peak FRP: ${z.max_frp} MW (Avg: ${z.avg_frp} MW)`,
+                                        `⚠️ Status: ${z.risk_level}`
+                                    ];
+                                    if (z.sample_cities && z.sample_cities.length) {
+                                        lines.push(`📍 Hubs: ${z.sample_cities.join(', ')}`);
+                                    }
+                                    lines.push(`🎯 Click bar to focus on map`);
+                                    return lines;
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                            ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } }
+                            ticks: {
+                                color: '#f8fafc',
+                                font: { family: 'Outfit', size: 11, weight: '500' },
+                                maxRotation: 25,
+                                minRotation: 0
+                            }
                         },
                         y: {
                             stacked: true,
                             grid: { color: 'rgba(255, 255, 255, 0.05)' },
                             ticks: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } },
-                            title: { display: true, text: 'Fires Detected', color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
+                            title: { display: true, text: 'Active Hotspots', color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
                         },
                         yFrp: {
                             position: 'right',
                             grid: { drawOnChartArea: false },
                             ticks: {
-                                color: '#38bdf8',
+                                color: '#c084fc',
                                 font: { family: 'Outfit', size: 11 },
                                 callback: v => v + ' MW'
                             },
-                            title: { display: true, text: 'Avg Radiative Power', color: '#38bdf8', font: { size: 10, family: 'Outfit' } }
+                            title: { display: true, text: 'Peak Radiative Power (MW)', color: '#c084fc', font: { size: 10, family: 'Outfit' } }
                         }
                     }
                 }
             });
         })
-        .catch(err => console.error('Error loading fire history chart:', err));
+        .catch(err => console.error('Error loading global heating zones chart:', err));
 }
 
 // ─── Most Active Global Fire Zones ──────────────────────────────────────────

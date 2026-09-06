@@ -287,38 +287,39 @@
                 </div>
 
                 <div class="drawer-cards-grid">
-                    <!-- Card A: Global Fire History Analysis Graph -->
+                    <!-- Card A: Global Heating Zones Graph -->
                     <div class="deck-card glass-panel fire-history-card">
                         <div class="deck-card-header">
                             <div class="card-title-group">
-                                <span class="card-icon">📈</span>
+                                <span class="card-icon">🔥</span>
                                 <div>
-                                    <h3>Global Fire History & Temporal Scan</h3>
-                                    <p class="card-subtitle">Multi-satellite temporal trend across world coordinates (Aug 24 – Sep 05)</p>
+                                    <h3>Global Heating Zones & Thermal Power</h3>
+                                    <p class="card-subtitle">Active heating zones across the globe ranked by fire density & radiative power</p>
                                 </div>
                             </div>
                             <div class="chart-metric-pills">
                                 <span class="metric-badge"><span class="dot red"></span> Industrial</span>
                                 <span class="metric-badge"><span class="dot orange"></span> Forest</span>
                                 <span class="metric-badge"><span class="dot yellow"></span> Agri</span>
-                                <span class="metric-badge"><span class="dot cyan"></span> FRP (MW)</span>
+                                <span class="metric-badge"><span class="dot cyan"></span> Persistent</span>
+                                <span class="metric-badge"><span class="dot" style="background:#c084fc;"></span> Peak FRP</span>
                             </div>
                         </div>
-                        <div class="history-chart-wrapper">
+                        <div class="history-chart-wrapper" style="cursor: pointer;" title="Click any zone on graph to fly and focus on map">
                             <canvas id="fireHistoryChart"></canvas>
                         </div>
                         <div class="history-stats-ribbon">
                             <div class="ribbon-item">
-                                <span class="ribbon-lbl">Peak Detection Volume</span>
-                                <span class="ribbon-val" id="hist-peak-vol">776 Fires</span>
+                                <span class="ribbon-lbl">Highest Thermal Power</span>
+                                <span class="ribbon-val" id="hist-peak-vol">-- MW</span>
                             </div>
                             <div class="ribbon-item">
-                                <span class="ribbon-lbl">Average Radiative Power</span>
-                                <span class="ribbon-val" id="hist-avg-frp">60.7 MW</span>
+                                <span class="ribbon-lbl">Densest Heating Hub</span>
+                                <span class="ribbon-val" id="hist-avg-frp">-- Fires</span>
                             </div>
                             <div class="ribbon-item">
-                                <span class="ribbon-lbl">Monitored Multi-Day Total</span>
-                                <span class="ribbon-val" id="hist-total-fires">1,894 Hotspots</span>
+                                <span class="ribbon-lbl">Global Heating Hubs</span>
+                                <span class="ribbon-val" id="hist-total-fires">-- Hotspots</span>
                             </div>
                         </div>
                     </div>
@@ -419,6 +420,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Custom JS -->
-    <script src="app_v8.js?v=43"></script>
+    <script src="app_v8.js?v=44"></script>
 </body>
 </html>
