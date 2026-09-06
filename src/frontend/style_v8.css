@@ -1369,3 +1369,41 @@ body {
     padding: 3px 8px;
     border-radius: 12px;
 }
+
+/* ─── Tactical Emergency Alarm & Siren UI ─────────────────────────────────── */
+.alarm-siren-badge {
+    display: inline-block;
+    font-size: 1.15rem;
+    animation: alertSirenShake 0.6s infinite alternate;
+}
+
+@keyframes alertSirenShake {
+    0% { transform: scale(1) rotate(-10deg); }
+    100% { transform: scale(1.25) rotate(10deg); }
+}
+
+.mode-pill-btn.alarm-playing {
+    background: rgba(239, 68, 68, 0.25) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.6) !important;
+    animation: alarmButtonPulse 0.8s infinite alternate !important;
+}
+
+@keyframes alarmButtonPulse {
+    from {
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+        transform: scale(1);
+    }
+    to {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+        transform: scale(1.04);
+    }
+}
+
+.mode-pill-btn.alarm-pending {
+    background: rgba(234, 179, 8, 0.2) !important;
+    color: #facc15 !important;
+    border: 1px solid rgba(234, 179, 8, 0.5) !important;
+    animation: alertPulse 1.5s infinite alternate !important;
+}
+

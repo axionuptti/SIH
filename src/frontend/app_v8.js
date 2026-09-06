@@ -80,6 +80,290 @@ window.toggleFullScreen = function(e) {
     }, 450);
 };
 
+// ─── Tactical Emergency Alarm Engine (HTML5 Audio + Web Audio API) ─────────
+class TacticalAlarmEngine {
+    constructor() {
+        this.audioEl = null;
+        this.ctx = null;
+        this.isPlaying = false;
+        this.isMuted = false;
+        this.timer = null;
+        this.pendingAlert = false;
+        this.unlocked = false;
+        this.alarmTimeout = null;
+
+        // Auto-unlock audio playback on user interaction anywhere on page
+        const unlockAudio = () => {
+            this.unlocked = true;
+            this.initAudioContext();
+            if (this.pendingAlert && !this.isMuted) {
+                this.playAlarm("User interaction unlocked pending emergency alarm");
+            }
+        };
+
+        ['click', 'touchstart', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, unlockAudio, { passive: true, capture: true });
+        });
+    }
+
+    getAudioElement() {
+        if (!this.audioEl) {
+            this.audioEl = document.getElementById('emergency-siren-audio');
+        }
+        return this.audioEl;
+    }
+
+    initAudioContext() {
+        if (!this.ctx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                this.ctx = new AudioContextClass();
+            }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+        }
+    }
+
+    playAlarm(reason = "Emergency Alert") {
+        if (this.isMuted) {
+            console.log("[Alarm] Siren is muted by user.");
+            this.updateUI();
+            return;
+        }
+
+        const audio = this.getAudioElement();
+        this.initAudioContext();
+
+        this.isPlaying = true;
+        this.pendingAlert = false;
+        this.updateUI();
+
+        console.log(`[Alarm] 🚨 Emergency Alarm Sounding! Reason: ${reason}`);
+
+        // Method 1: HTML5 Audio (Plays real physical siren: alert_siren.wav)
+        let htmlAudioPlayed = false;
+        if (audio) {
+            audio.volume = 0.95;
+            audio.loop = true;
+            const promise = audio.play();
+            if (promise !== undefined) {
+                promise.then(() => {
+                    htmlAudioPlayed = true;
+                    console.log("[Alarm] 🔊 HTML5 audio siren playing successfully.");
+                }).catch(err => {
+                    console.warn("[Alarm] Browser blocked autoplay awaiting user click:", err.name);
+                    this.pendingAlert = true;
+                    this.updateUI(true);
+                });
+            }
+        }
+
+        // Method 2: Web Audio API Synthesizer as fallback/enhancement
+        if (!htmlAudioPlayed && this.ctx && this.ctx.state === 'running') {
+            this.startWebAudioOscillator();
+        }
+
+        // Auto-silence safety window after 60 seconds
+        if (this.alarmTimeout) clearTimeout(this.alarmTimeout);
+        this.alarmTimeout = setTimeout(() => {
+            if (this.isPlaying) {
+                console.log("[Alarm] Auto-silencing siren after 60s safety timeout.");
+                this.stopAlarm();
+            }
+        }, 60000);
+    }
+
+    startWebAudioOscillator() {
+        if (this.timer) return;
+        let step = 0;
+        const sirenPattern = [960, 760, 960, 760, 960, 760];
+
+        const playTone = () => {
+            if (!this.isPlaying || this.isMuted || !this.ctx || this.ctx.state !== 'running') {
+                if (this.timer) clearTimeout(this.timer);
+                this.timer = null;
+                return;
+            }
+
+            if (step >= sirenPattern.length) {
+                step = 0;
+                this.timer = setTimeout(playTone, 380);
+                return;
+            }
+
+            try {
+                const freq = sirenPattern[step];
+                const duration = 0.28;
+                const now = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now);
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
+                gain.gain.setValueAtTime(0.25, now + duration - 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+
+                step++;
+                this.timer = setTimeout(playTone, duration * 1000);
+            } catch (e) {
+                // Ignore Web Audio errors
+            }
+        };
+
+        playTone();
+    }
+
+    stopAlarm() {
+        this.isPlaying = false;
+        this.pendingAlert = false;
+
+        const audio = this.getAudioElement();
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        if (this.alarmTimeout) {
+            clearTimeout(this.alarmTimeout);
+            this.alarmTimeout = null;
+        }
+
+        this.updateUI();
+        console.log("[Alarm] 🔇 Emergency alarm silenced.");
+    }
+
+    toggleMute() {
+        this.isMuted = !this.isMuted;
+        if (this.isMuted) {
+            this.stopAlarm();
+        } else {
+            this.playAlarm("User unmuted alarm");
+        }
+        this.updateUI();
+        return !this.isMuted;
+    }
+
+    updateUI(isPendingGesture = false) {
+        const alarmBtn = document.getElementById('btn-alarm-toggle');
+        const iconEl = document.getElementById('alarm-btn-icon');
+        const textEl = document.getElementById('alarm-btn-text');
+
+        if (alarmBtn && iconEl && textEl) {
+            if (this.isMuted) {
+                alarmBtn.classList.remove('alarm-playing', 'alarm-pending');
+                iconEl.innerText = '🔇';
+                textEl.innerText = 'Alarm: MUTED';
+                alarmBtn.title = 'Alarm is muted. Click to sound alarm.';
+            } else if (this.isPlaying) {
+                alarmBtn.classList.add('alarm-playing');
+                alarmBtn.classList.remove('alarm-pending');
+                iconEl.innerText = '🚨';
+                textEl.innerText = 'ALARM SOUNDING';
+                alarmBtn.title = 'Emergency alarm is sounding! Click to silence.';
+            } else if (isPendingGesture || this.pendingAlert) {
+                alarmBtn.classList.add('alarm-pending');
+                iconEl.innerText = '🔔';
+                textEl.innerText = 'Click to Sound Alarm';
+                alarmBtn.title = 'Browser blocked auto-sound. Click anywhere to activate alarm sound.';
+            } else {
+                alarmBtn.classList.remove('alarm-playing', 'alarm-pending');
+                iconEl.innerText = '🔊';
+                textEl.innerText = 'SOUND ALARM';
+                alarmBtn.title = 'Click to test/sound the emergency alarm.';
+            }
+        }
+
+        const playBtn = document.getElementById('btn-play-siren');
+        const silenceBtn = document.getElementById('btn-silence-alert');
+        if (playBtn) {
+            playBtn.style.display = this.isPlaying ? 'none' : 'inline-block';
+        }
+        if (silenceBtn) {
+            silenceBtn.style.display = this.isPlaying ? 'inline-block' : 'none';
+        }
+    }
+}
+
+window.alarmEngine = new TacticalAlarmEngine();
+
+window.enterDashboardWithAlarm = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const popup = document.getElementById('initial-fire-popup');
+    if (popup) popup.style.display = 'none';
+    if (window.alarmEngine) {
+        window.alarmEngine.isMuted = false;
+        window.alarmEngine.playAlarm("User clicked ACTIVATE ALARM & VIEW DASHBOARD");
+    }
+};
+
+window.silenceAndEnter = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const popup = document.getElementById('initial-fire-popup');
+    if (popup) popup.style.display = 'none';
+    if (window.alarmEngine) {
+        window.alarmEngine.stopAlarm();
+        window.alarmEngine.isMuted = true;
+    }
+};
+
+window.soundAlarmNow = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (window.alarmEngine) {
+        window.alarmEngine.isMuted = false;
+        window.alarmEngine.playAlarm("User explicitly clicked Play Siren button");
+    }
+};
+
+window.silenceAlarm = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (window.alarmEngine) {
+        window.alarmEngine.stopAlarm();
+    }
+};
+
+window.dismissAlertBanner = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    const alertEl = document.getElementById('critical-alert');
+    if (alertEl) alertEl.style.display = 'none';
+    if (window.alarmEngine) {
+        window.alarmEngine.stopAlarm();
+    }
+};
+
+window.acknowledgeFirePopup = function(e) {
+    window.enterDashboardWithAlarm(e);
+};
+
+window.toggleAlarmSound = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!window.alarmEngine) return;
+    if (window.alarmEngine.isPlaying) {
+        window.alarmEngine.stopAlarm();
+    } else {
+        window.alarmEngine.isMuted = false;
+        window.alarmEngine.playAlarm("User clicked top bar sound button");
+    }
+};
+
+
 // ─── Layer Groups ─────────────────────────────────────────────────────────────
 const layerGroups = {
     'Industrial Fire':                      L.layerGroup(),
@@ -670,20 +954,46 @@ function loadData() {
             if (document.getElementById('forest-fire-count')) animateValue('forest-fire-count', prevCounts.forest, counts.forest, 800);
             window.currentCounts = counts;
 
-            // Trigger Siren Popup only when NEW critical fires appear after initial scan
+            // Trigger Emergency Alarm & Siren Popup for critical fires (Industrial / Forest)
             const currentCriticalCount = counts.industrial + counts.forest;
-            if (window.lastCriticalCount === undefined) {
+            const isInitialScan = (window.lastCriticalCount === undefined);
+
+            if (isInitialScan) {
                 window.lastCriticalCount = currentCriticalCount;
+                if (currentCriticalCount > 0) {
+                    // Show initial popup modal when active critical blazes are present
+                    const sirenPopup = document.getElementById('initial-fire-popup');
+                    if (sirenPopup) {
+                        sirenPopup.style.display = 'flex';
+                        const textEl = document.getElementById('initial-fire-popup-text');
+                        if (textEl) {
+                            textEl.innerHTML = `<strong>🚨 CRITICAL HAZARDS DETECTED:</strong> Detected <strong>${counts.industrial} Industrial Fire(s)</strong> and <strong>${counts.forest} Forest Wildfire(s)</strong> worldwide. Operational emergency alarm is sounding.`;
+                        }
+                    }
+                    if (window.alarmEngine) {
+                        window.alarmEngine.playAlarm(`Active baseline contains ${currentCriticalCount} critical fires`);
+                    }
+                }
             } else if (currentCriticalCount > window.lastCriticalCount) {
+                const diff = currentCriticalCount - window.lastCriticalCount;
                 const sirenPopup = document.getElementById('initial-fire-popup');
                 if (sirenPopup) {
                     sirenPopup.style.display = 'flex';
                     const textEl = document.getElementById('initial-fire-popup-text');
                     if (textEl) {
-                        textEl.innerHTML = `<strong>🚨 SIREN ALERT:</strong> ${currentCriticalCount - window.lastCriticalCount} NEW critical hazard(s) detected since last scan! Immediate attention required.`;
+                        textEl.innerHTML = `<strong>🚨 NEW SATELLITE ALERT:</strong> ${diff} NEW critical hazard(s) detected in latest overpass! Immediate response required.`;
                     }
                 }
+                if (window.alarmEngine) {
+                    window.alarmEngine.hasBeenAcknowledged = false; // Reset acknowledgment for newly arriving hazard
+                    window.alarmEngine.playAlarm(`${diff} NEW critical hazard(s) detected`);
+                }
                 window.lastCriticalCount = currentCriticalCount;
+            } else if (currentCriticalCount === 0) {
+                if (window.alarmEngine && window.alarmEngine.isPlaying) {
+                    window.alarmEngine.stopAlarm();
+                }
+                window.lastCriticalCount = 0;
             }
 
             // Update critical alert banner
@@ -693,6 +1003,9 @@ function loadData() {
                 const alertText = document.getElementById('alert-text');
                 if (alertText) {
                     alertText.innerText = `⚠️  ${currentCriticalCount} CRITICAL alert${currentCriticalCount > 1 ? 's' : ''} active (Fires/Leaks)`;
+                }
+                if (currentCriticalCount > 0 && window.alarmEngine && !window.alarmEngine.isPlaying && !window.alarmEngine.isMuted) {
+                    window.alarmEngine.playAlarm("Critical alert banner active");
                 }
             }
 
@@ -1030,6 +1343,9 @@ map.on('zoomend', window.updateHotspotVisibility);
 
 // ─── FlyTo Interactive Feature ───────────────────────────────────────────────
 window.flyToIncident = function(lat, lon) {
+    if (window.alarmEngine && !window.alarmEngine.isMuted) {
+        window.alarmEngine.playAlarm(`Inspecting incident at ${lat}, ${lon}`);
+    }
     map.flyTo([lat, lon], 16, {
         animate: true,
         duration: 1.5
