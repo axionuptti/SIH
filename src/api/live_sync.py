@@ -73,6 +73,10 @@ class LiveSyncManager:
         if os.path.exists(PROCESSED_GEOJSON_PATH):
             try:
                 file_mtime = os.path.getmtime(PROCESSED_GEOJSON_PATH)
+                if not self.is_syncing:
+                    with open(PROCESSED_GEOJSON_PATH, "r", encoding="utf-8") as f:
+                        doc = json.load(f)
+                        self.total_fires_synced = len(doc.get("features", []))
             except Exception:
                 pass
         
@@ -81,7 +85,7 @@ class LiveSyncManager:
         return {
             "status": "syncing" if self.is_syncing else ("active" if self.last_sync_time else "ready"),
             "is_syncing": self.is_syncing,
-            "last_sync_utc": self.last_sync_time.strftime("%Y-%m-%d %H:%M:%S UTC") if self.last_sync_time else "Initial Startup",
+            "last_sync_utc": self.last_sync_time.strftime("%Y-%m-%d %H:%M:%S UTC") if self.last_sync_time else "Active Baseline",
             "latest_satellite_acq": self.latest_acq_utc,
             "total_fires_active": self.total_fires_synced,
             "sync_interval_seconds": SYNC_INTERVAL_SECONDS,
@@ -196,6 +200,19 @@ class LiveSyncManager:
                 deduped['state'] = ""
                 deduped['city'] = ""
 
+            # Extract known industrial coordinates from baseline catalog
+            known_ind_coords = set()
+            if os.path.exists(PROCESSED_GEOJSON_PATH):
+                try:
+                    with open(PROCESSED_GEOJSON_PATH, "r", encoding="utf-8") as f_prev:
+                        prev_data = json.load(f_prev)
+                        for pf in prev_data.get("features", []):
+                            p = pf.get("properties", {})
+                            if p.get("is_industrial") or p.get("is_industrial_map"):
+                                known_ind_coords.add((round(p.get("latitude", 0), 2), round(p.get("longitude", 0), 2)))
+                except Exception:
+                    pass
+
             # Tactical Classification & Physics Modeling
             features = []
             for _, row in deduped.iterrows():
@@ -210,10 +227,11 @@ class LiveSyncManager:
                 conf = str(row.get('confidence', 'nominal'))
 
                 # Tactical Classification rules complying with environmental physics & user mandate:
-                # 1. Check if coordinate is in the Ocean / Sea / Maritime waters
                 is_on_land = bool(globe.is_land(lat, lon))
-                has_map_data = bool(row.get('country') or row.get('city'))
                 loc_raw = row.get('location_name', '')
+                is_ind_coord = (round(lat, 2), round(lon, 2)) in known_ind_coords
+                is_ind_row = bool(row.get('is_industrial', False)) or bool(row.get('is_industrial_map', False))
+                is_ind = is_ind_coord or is_ind_row
 
                 # ─────────────────────────────────────────────────────────────
                 # RULE 1: Ocean / Sea / Water Body
@@ -237,32 +255,11 @@ class LiveSyncManager:
                         loc_str = f"Offshore Energy Platform ({lat:.2f}°, {lon:.2f}°)"
 
                 # ─────────────────────────────────────────────────────────────
-                # RULE 2: No Map Data / Remote Unclassified Coordinates
-                # ─────────────────────────────────────────────────────────────
-                # If there is no map data, cannot classify as forest fire or accidental industrial fire.
-                # Must be kept under Persistent Industrial Thermal Source (ongoing/regular work).
-                elif not has_map_data:
-                    cls = "Persistent Industrial Thermal Source"
-                    ai_conf = 0.88
-                    terrain = "Unmapped Industrial Sector"
-                    risk = "Routine Operational"
-                    strat = "Routine Thermal Tracking & Satellite Emissions Monitoring"
-                    speed = 0.0
-                    fac_type = "Continuous Industrial Thermal Work"
-                    zone_type = "Persistent Thermal Operation"
-                    loc_str = f"Industrial Thermal Zone ({lat:.2f}°, {lon:.2f}°)"
-
-                # ─────────────────────────────────────────────────────────────
-                # RULE 3: Regular Ongoing Industrial Works (Happening Regularly)
+                # RULE 2: Regular Ongoing Industrial Works (Verified Industrial Complex)
                 # ─────────────────────────────────────────────────────────────
                 # Refineries, petrochemical complexes, flare stacks, smelters, steel mills,
                 # cement kilns, and continuous industrial facilities operate 24/7.
-                # Any detection verified on an industrial site or with nighttime industrial thermal signatures:
-                # - If catastrophic emergency hazard spike (FRP >= 120 MW and B4 >= 365 K) -> Industrial Fire
-                # - All regular ongoing industrial operations -> Persistent Industrial Thermal Source
-                elif (row.get('is_industrial', False) or row.get('is_industrial_map', False) or 
-                      (b4 >= 355.0 and daynight == 'N') or 
-                      (b4 >= 360.0 and frp >= 60.0)):
+                elif is_ind:
                     if frp >= 120.0 and b4 >= 365.0:
                         cls = "Industrial Fire"
                         ai_conf = round(min(0.98, 0.88 + (frp / 600.0) * 0.10), 2)
@@ -285,9 +282,9 @@ class LiveSyncManager:
                         loc_str = loc_raw or f"Industrial Facility ({lat:.2f}°, {lon:.2f}°)"
 
                 # ─────────────────────────────────────────────────────────────
-                # RULE 5: Wildfire / Forest Fire (Vegetation strictly on Land)
+                # RULE 3: Wildfire / Forest Fire (Vegetation strictly on Land)
                 # ─────────────────────────────────────────────────────────────
-                elif frp >= 40.0:
+                elif frp >= 35.0:
                     cls = "Forest Fire"
                     ai_conf = round(min(0.95, 0.78 + (frp / 400.0) * 0.16), 2)
                     terrain = "Forest Canopy"
@@ -299,7 +296,7 @@ class LiveSyncManager:
                     loc_str = loc_raw or f"Wildland Region ({lat:.2f}°, {lon:.2f}°)"
 
                 # ─────────────────────────────────────────────────────────────
-                # RULE 6: Agricultural Burn (Crop residue strictly on Land)
+                # RULE 4: Agricultural Burn (Crop residue / Farmland on Land)
                 # ─────────────────────────────────────────────────────────────
                 else:
                     cls = "Agricultural Burn"
@@ -365,43 +362,26 @@ class LiveSyncManager:
                 }
                 features.append(feat)
 
-            # Preserve confirmed persistent ground-truth industrial facilities from previous catalogue
-            # (e.g. Jamnagar, Jurong, Houston, Ras Tanura) ensuring they are marked under Persistent Industrial Thermal Source
+            # Merge with existing active catalogue to preserve global fire monitoring coverage
+            merged_features = {}
             if os.path.exists(PROCESSED_GEOJSON_PATH):
                 try:
                     with open(PROCESSED_GEOJSON_PATH, "r", encoding="utf-8") as f_prev:
                         prev_data = json.load(f_prev)
                         for pf in prev_data.get("features", []):
                             p = pf.get("properties", {})
-                            p_lat = round(p.get("latitude", 0), 3)
-                            p_lon = round(p.get("longitude", 0), 3)
-                            p_land = bool(globe.is_land(p_lat, p_lon))
-                            
-                            # Standardize classification for persistent facilities
-                            if not p_land or p.get("ai_classification") in ["Industrial Fire", "Persistent Industrial Thermal Source"]:
-                                if not p_land:
-                                    p["ai_classification"] = "Persistent Industrial Thermal Source"
-                                    p["satellite_terrain"] = "Water / Offshore Marine Platform"
-                                    p["facility_type"] = "Offshore Oil/Gas Platform & Flare Rig"
-                                    p["zone_type"] = "Maritime Energy Extraction Field"
-                                    p["risk_level"] = "Routine Operational"
-                                    p["mitigation_strategy"] = "Continuous Offshore Flare Monitoring · Standard Maritime Operations"
-                                elif p.get("frp", 0) < 120.0:
-                                    p["ai_classification"] = "Persistent Industrial Thermal Source"
-                                    p["facility_type"] = p.get("facility_type") if p.get("facility_type") and p.get("facility_type") != "Unknown" else "Regular Operational Industrial Facility"
-                                    p["zone_type"] = p.get("zone_type") if p.get("zone_type") and p.get("zone_type") != "Unknown" else "Continuous Industrial Complex"
-                                    p["risk_level"] = "Controlled Operational"
-                                    p["mitigation_strategy"] = "Log Emissions & Routine Operational Monitoring"
-
-                                already_has = any(
-                                    round(f["properties"]["latitude"], 3) == p_lat and 
-                                    round(f["properties"]["longitude"], 3) == p_lon
-                                    for f in features
-                                )
-                                if not already_has:
-                                    features.append(pf)
+                            key = (round(p.get("latitude", 0), 2), round(p.get("longitude", 0), 2))
+                            merged_features[key] = pf
                 except Exception:
                     pass
+
+            # Update or insert newly fetched features
+            for feat in features:
+                p = feat["properties"]
+                key = (round(p.get("latitude", 0), 2), round(p.get("longitude", 0), 2))
+                merged_features[key] = feat
+
+            final_features = list(merged_features.values())
 
             geojson_doc = {
                 "type": "FeatureCollection",
@@ -412,7 +392,7 @@ class LiveSyncManager:
                         "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
                     }
                 },
-                "features": features
+                "features": final_features
             }
 
             # Atomic save to prevent half-written files
@@ -423,13 +403,13 @@ class LiveSyncManager:
             os.replace(tmp_path, PROCESSED_GEOJSON_PATH)
 
             self.last_sync_time = datetime.now(timezone.utc)
-            self.total_fires_synced = len(features)
+            self.total_fires_synced = len(final_features)
             self.sync_count += 1
             self.is_syncing = False
 
             return {
                 "status": "success",
-                "message": f"Successfully synced {len(features)} active fires from NASA FIRMS NRT.",
+                "message": f"Successfully synced {len(features)} active satellite fires (total active catalog: {len(final_features)}).",
                 "latest_satellite_acq": self.latest_acq_utc,
                 "total_fires": self.total_fires_synced,
                 "sync_time_utc": self.last_sync_time.strftime("%Y-%m-%d %H:%M:%S UTC")
