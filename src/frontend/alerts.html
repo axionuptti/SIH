@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>SIH26162 | Emergency Citizen & Responder Alert Portal</title>
+    
+    <!-- Google Fonts: Outfit for premium modern aesthetic (matching main dashboard) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Critical Dark Background Inline Style (Guaranteed dark background instantly) -->
+    <style>
+        html, body {
+            background-color: #050505 !important;
+            color: #f8fafc !important;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', -apple-system, sans-serif;
+            min-height: 100vh;
+        }
+    </style>
+
+    <!-- Alert Portal Stylesheet (Harmonized with style_v8.css) -->
+    <link rel="stylesheet" href="/dashboard/alerts.css?v=10">
+    <link rel="stylesheet" href="/alerts.css?v=10">
+</head>
+<body>
+
+    <!-- Embedded Audio Siren for Guaranteed Emergency Playback -->
+    <audio id="emergency-siren-audio" src="/dashboard/alert_siren.wav" loop preload="auto"></audio>
+
+    <!-- Ambient Background Gradients for Depth (Exact Match to Main Dashboard) -->
+    <div class="bg-gradient-1"></div>
+    <div class="bg-gradient-2"></div>
+
+    <!-- Critical Alert Broadcast Banner (Appears when in CRITICAL / HIGH) -->
+    <div id="critical-alert-banner" class="critical-alert-banner" style="display: none;">
+        <div class="banner-inner">
+            <span class="banner-siren-icon">🚨</span>
+            <div class="banner-text">
+                <strong id="banner-title">CRITICAL FIRE THREAT IN YOUR SECTOR</strong>
+                <span id="banner-desc">Thermal anomaly detected within immediate hazard perimeter. Review safe evacuation vector below.</span>
+            </div>
+            <div class="banner-actions">
+                <button id="banner-siren-btn" onclick="window.toggleSirenSound()" class="mode-pill-btn" style="background: rgba(0,0,0,0.4); color: #fff; border-color: rgba(255,255,255,0.3);">
+                    🔊 Sound Alarm
+                </button>
+                <button onclick="window.dismissBanner()" class="mode-pill-btn" style="background: rgba(255,255,255,0.15); color: #fff; border: none;">
+                    ✕ Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container Matching Dashboard Layout -->
+    <div class="portal-container">
+
+        <!-- Sidebar: Location Feeding, Radar Status & Playbooks -->
+        <aside class="sidebar glass-panel">
+            
+            <!-- Logo Section matching Main Dashboard -->
+            <header class="logo-section">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <defs>
+                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ef4444" />
+                                <stop offset="100%" stop-color="#f97316" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M12 2c0 0-5 6.5-5 11a5 5 0 0 0 10 0c0-4.5-5-11-5-11Z"/>
+                        <path d="M12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>SIH26162</h1>
+                    <p class="subtitle" style="color: #ef4444;">EMERGENCY EVACUATION & RADAR</p>
+                </div>
+            </header>
+
+            <div class="divider"></div>
+
+            <!-- Global Location Search Bar with Live Autocomplete -->
+            <section class="search-section">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="global-search-input" placeholder="Search any city, district or address..." autocomplete="off">
+                    <button id="btn-clear-search" style="display: none;" onclick="window.clearSearch()">✕</button>
+                </div>
+                <div id="search-suggestions-dropdown" class="search-dropdown glass-panel" style="display: none;"></div>
+            </section>
+
+            <!-- GPS Auto-Detect & Coordinate Feeding -->
+            <section class="location-feed-section">
+                <button id="btn-gps-detect" class="btn-gps" onclick="window.detectUserGPS()">
+                    <span class="gps-beacon-dot"></span>
+                    <span id="gps-btn-text">📍 Use My Current Location (GPS)</span>
+                </button>
+
+                <!-- Quick Regional Hotspot Presets -->
+                <div class="preset-pills-row">
+                    <span class="preset-label">PRESETS:</span>
+                    <div class="preset-pills-scroll">
+                        <button class="preset-pill active" onclick="window.loadPreset(22.47, 70.06, 'Jamnagar Oil Refinery Belt, India')">Jamnagar Hub</button>
+                        <button class="preset-pill" onclick="window.loadPreset(30.50, 47.80, 'Basra Gas Flares, Iraq')">Basra Corridor</button>
+                        <button class="preset-pill" onclick="window.loadPreset(47.35, 34.98, 'Dniprorudne Timber Zone, Ukraine')">Dniprorudne</button>
+                        <button class="preset-pill" onclick="window.loadPreset(-9.50, -55.00, 'Amazon Wildfire Frontier, Brazil')">Amazon</button>
+                        <button class="preset-pill" onclick="window.loadPreset(28.61, 77.20, 'New Delhi Capital Region, India')">Safe Zone (Delhi)</button>
+                    </div>
+                </div>
+
+                <!-- Coordinate & Radius Form -->
+                <div class="coords-row">
+                    <div class="coord-col">
+                        <label>Latitude</label>
+                        <input type="number" step="any" id="input-lat" value="22.4707" onchange="window.handleCoordChange()">
+                    </div>
+                    <div class="coord-col">
+                        <label>Longitude</label>
+                        <input type="number" step="any" id="input-lon" value="70.0654" onchange="window.handleCoordChange()">
+                    </div>
+                </div>
+
+                <!-- Radius Slider -->
+                <div class="radius-slider-box">
+                    <div class="radius-title-row">
+                        <span>Threat Radar Perimeter:</span>
+                        <span id="radius-val" class="radius-tag">50 km</span>
+                    </div>
+                    <input type="range" id="radius-slider" min="10" max="100" step="5" value="50" oninput="window.updateRadius(this.value)">
+                </div>
+
+                <div class="resolved-location-banner" id="resolved-location-banner">
+                    <span class="pulse-dot-green"></span>
+                    <span id="resolved-location-text">Jamnagar Oil Refinery Belt, India</span>
+                </div>
+            </section>
+
+            <div class="divider"></div>
+
+            <!-- Stats Grid Matching style_v8.css -->
+            <section class="stats-grid">
+                <div class="stat-card" id="card-threat-level">
+                    <span class="stat-label">Threat Status</span>
+                    <h2 class="stat-value text-danger" id="stat-threat-level" style="font-size: 1.3rem; font-weight: 700;">Analyzing...</h2>
+                    <div class="stat-sparkline red-glow"></div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-label">Nearest Fire</span>
+                    <h2 class="stat-value text-danger" id="stat-nearest-dist">--</h2>
+                    <div class="stat-sparkline blue-glow"></div>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Peak Radiative Power</span>
+                    <h2 class="stat-value" id="stat-peak-frp" style="color: #c084fc;">-- MW</h2>
+                    <div class="stat-sparkline purple-glow"></div>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-label">Air Quality (AQI)</span>
+                    <h2 class="stat-value" id="stat-aqi" style="color: #38bdf8;">--</h2>
+                    <div class="stat-sparkline blue-glow"></div>
+                </div>
+            </section>
+
+            <!-- Safe Egress Corridor Card -->
+            <section class="safe-vector-card glass-panel" id="safe-vector-box">
+                <div class="vector-header">
+                    <span class="compass-icon" id="vector-compass-icon">🧭</span>
+                    <div>
+                        <span class="vector-sub">RECOMMENDED SAFE EVACUATION HEADING</span>
+                        <h3 class="vector-heading" id="vector-heading-text">Heading --° (--)</h3>
+                    </div>
+                </div>
+                <p class="vector-note" id="vector-note-text">Scanning surrounding satellite anomalies...</p>
+                <div class="vector-buffer-row">
+                    <span class="buffer-label">Minimum Standoff Distance:</span>
+                    <span class="buffer-value" id="vector-buffer-val">-- km</span>
+                </div>
+            </section>
+
+            <!-- SOS Communication Hub -->
+            <section class="sos-hub-section">
+                <span class="section-micro-title">EMERGENCY SOS BROADCAST</span>
+                <div class="sos-buttons-grid">
+                    <button class="sos-action-btn whatsapp" onclick="window.sendWhatsAppSOS()" title="Broadcast current GPS and fire proximity via WhatsApp">
+                        <span>📲</span> WhatsApp SOS
+                    </button>
+                    <button class="sos-action-btn sms" onclick="window.sendSmsSOS()" title="Send SMS with coordinates to family / contacts">
+                        <span>✉️</span> SMS Alert
+                    </button>
+                    <a href="tel:101" class="sos-action-btn phone" title="Call Fire Brigade">
+                        <span>🚒</span> Fire: 101
+                    </a>
+                    <a href="tel:100" class="sos-action-btn phone" title="Call Police Dispatch">
+                        <span>🚓</span> Police: 100
+                    </a>
+                </div>
+            </section>
+
+            <!-- Sidebar Footer -->
+            <div class="sidebar-footer">
+                <div class="system-info">
+                    <p>Sensor: <strong>NASA VIIRS 375m (Suomi-NPP & NOAA-20)</strong></p>
+                    <p>Status: <strong style="color: #10b981;">Online & Monitoring Proximity</strong></p>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Main Map & Tactical Playbook Canvas -->
+        <main class="map-wrapper">
+            
+            <!-- Leaflet Tactical Radar Map -->
+            <div id="radar-map"></div>
+
+            <!-- Floating Header inside Map Matching Dashboard -->
+            <div class="floating-header glass-panel">
+                <div class="location-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                    <span>SIH26162 · Emergency Evacuation Radar</span>
+                </div>
+
+                <div class="time-info">
+                    <span id="current-time">Live Threat Feed Active</span>
+                </div>
+
+                <!-- Mode Switcher: Civilian Evacuation vs Responder Incident Command -->
+                <div class="view-mode-pill-group">
+                    <button id="btn-mode-civilian" class="mode-pill-btn active" onclick="window.switchPortalTab('civilian')">
+                        🛡️ Civilian Evacuation
+                    </button>
+                    <button id="btn-mode-responder" class="mode-pill-btn" onclick="window.switchPortalTab('responder')">
+                        🚒 Responder Command
+                    </button>
+                </div>
+
+                <!-- Audio Siren Toggle -->
+                <button id="btn-alarm-toggle" class="mode-pill-btn" onclick="window.toggleSirenSound()" title="Emergency Siren Alarm (Click to toggle sound or silence)">
+                    <span id="alarm-btn-icon">🔊</span> <span id="alarm-btn-text">Alarm: ARMED</span>
+                </button>
+
+                <!-- Export Briefing / Print -->
+                <button class="mode-pill-btn" onclick="window.print()" title="Print or save Emergency Action Briefing">
+                    <span>🖨️ Export Plan</span>
+                </button>
+
+                <!-- Return to Full Command Satellite Map -->
+                <a href="/dashboard" class="mode-pill-btn" style="color: #38bdf8; text-decoration: none;" title="Open global satellite command center">
+                    <span>🌐 Full Map ↗</span>
+                </a>
+            </div>
+
+            <!-- Floating Top Right Weather & Air Quality Bar -->
+            <div class="weather-floating-widget glass-panel" id="weather-widget">
+                <div class="weather-item">
+                    <span class="w-icon">🌡️</span>
+                    <span class="w-val" id="w-temp">--°C</span>
+                    <span class="w-lbl">Ambient Temp</span>
+                </div>
+                <div class="weather-divider"></div>
+                <div class="weather-item">
+                    <span class="w-icon">💧</span>
+                    <span class="w-val" id="w-hum">--%</span>
+                    <span class="w-lbl">Humidity</span>
+                </div>
+                <div class="weather-divider"></div>
+                <div class="weather-item">
+                    <span class="w-icon">💨</span>
+                    <span class="w-val" id="w-wind">-- km/h</span>
+                    <span class="w-lbl" id="w-wind-dir">Wind Direction</span>
+                </div>
+                <div class="weather-divider"></div>
+                <div class="weather-item">
+                    <span class="w-icon">🌫️</span>
+                    <span class="w-val" id="w-smoke-hazard">Clear</span>
+                    <span class="w-lbl">Smoke Risk</span>
+                </div>
+            </div>
+
+            <!-- Floating Bottom Dock: Tactical Action Drawer Trigger -->
+            <div class="map-bottom-dock">
+                <button id="dock-action-btn" class="dock-pill-btn glass-panel" onclick="window.toggleActionDrawer()">
+                    <span class="dock-pulse-dot"></span>
+                    <span id="dock-btn-title" style="font-weight: 600;">📋 Evacuation Checklist & Shelters</span>
+                    <span class="dock-pill-badge" id="dock-shelters-badge">3 Shelters</span>
+                    <span id="dock-chevron-icon" class="dock-chevron">▲</span>
+                </button>
+            </div>
+
+            <!-- Bottom Tactical Action Drawer -->
+            <section id="action-drawer" class="action-drawer-container">
+                <div class="drawer-header-bar">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.1rem;" id="drawer-header-icon">📋</span>
+                        <span style="font-size: 0.95rem; font-weight: 700; color: #f8fafc;" id="drawer-header-title">Civilian Evacuation Steps & Nearest Assembly Shelters</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="checklist-progress-badge" id="drawer-progress-text">0 / 4 Steps Done</span>
+                        <button class="drawer-close-btn" onclick="window.toggleActionDrawer(false)">✕ Minimize</button>
+                    </div>
+                </div>
+
+                <!-- TAB 1 CONTENT: Civilian Evacuation Checklist & Safe Shelters -->
+                <div id="tab-civilian-content" class="drawer-tab-content">
+                    <div class="drawer-split-grid">
+                        
+                        <!-- Left: Interactive Checklist -->
+                        <div class="drawer-card glass-panel">
+                            <div class="drawer-card-head">
+                                <h3>Actionable Survival Checklist</h3>
+                                <button class="btn-text-action" onclick="window.resetChecklist()">Reset Steps</button>
+                            </div>
+                            <div class="checklist-items-scroll" id="checklist-items-scroll">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Right: Designated Safe Shelters & Assembly Hubs -->
+                        <div class="drawer-card glass-panel">
+                            <div class="drawer-card-head">
+                                <h3>Designated Safe Shelters & Assembly Hubs</h3>
+                                <span class="tag-green">ACTIVE ZONES</span>
+                            </div>
+                            <div class="shelters-scroll-list" id="shelters-scroll-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TAB 2 CONTENT: First Responder & Incident Command Tactics -->
+                <div id="tab-responder-content" class="drawer-tab-content" style="display: none;">
+                    <div class="drawer-split-grid">
+                        
+                        <!-- Left: Suppression Engineering Metrics -->
+                        <div class="drawer-card glass-panel">
+                            <div class="drawer-card-head">
+                                <h3>Suppression Hydraulics & Chemical Foam Calculator</h3>
+                                <span class="tag-red">INCIDENT COMMAND</span>
+                            </div>
+                            <div class="responder-metrics-grid" id="responder-metrics-grid">
+                                <div class="resp-metric-box">
+                                    <span class="resp-label">Required Fire Flow</span>
+                                    <h4 class="resp-val" id="resp-flow">-- L/min</h4>
+                                    <span class="resp-sub">Continuous water application</span>
+                                </div>
+                                <div class="resp-metric-box">
+                                    <span class="resp-label">AR-AFFF Foam (3%)</span>
+                                    <h4 class="resp-val" id="resp-foam">-- L/min</h4>
+                                    <span class="resp-sub">Vapor suppression blanket</span>
+                                </div>
+                                <div class="resp-metric-box">
+                                    <span class="resp-label">Water Tankers Needed</span>
+                                    <h4 class="resp-val" id="resp-tankers">-- Units</h4>
+                                    <span class="resp-sub">Heavy supply shuttle</span>
+                                </div>
+                                <div class="resp-metric-box">
+                                    <span class="resp-label">Deluge Curtains</span>
+                                    <h4 class="resp-val" id="resp-deluge">-- Lines</h4>
+                                    <span class="resp-sub">LPG tank cooling (prevent BLEVE)</span>
+                                </div>
+                            </div>
+                            <div class="tactic-warning-banner" id="tactic-warning-banner">
+                                <strong>⚠️ CRITICAL OPERATIONAL DIRECTIVE:</strong>
+                                <span id="tactic-warning-text">NEVER apply straight stream water directly into open liquid hydrocarbon pools.</span>
+                            </div>
+                        </div>
+
+                        <!-- Right: Fuel Tactics & PPE Standard -->
+                        <div class="drawer-card glass-panel">
+                            <div class="drawer-card-head">
+                                <h3>Containment Strategy & Mandatory PPE</h3>
+                                <span class="tag-orange" id="resp-fuel-tag">CLASS B</span>
+                            </div>
+                            <div class="tactics-details-list" id="tactics-details-list">
+                                <div class="tactic-item">
+                                    <span class="t-icon">🧪</span>
+                                    <div>
+                                        <strong>Primary Suppressant Agent:</strong>
+                                        <p id="resp-suppressant-text">AR-AFFF Foam & Purple-K Dry Chemical</p>
+                                    </div>
+                                </div>
+                                <div class="tactic-item">
+                                    <span class="t-icon">🚧</span>
+                                    <div>
+                                        <strong>Exclusion Perimeter:</strong>
+                                        <p id="resp-perimeter-text">Minimum 2.5 km upwind standoff; double downwind vapor corridor</p>
+                                    </div>
+                                </div>
+                                <div class="tactic-item">
+                                    <span class="t-icon">🤿</span>
+                                    <div>
+                                        <strong>Mandatory PPE Standard:</strong>
+                                        <p id="resp-ppe-text">Positive Pressure SCBA + Encapsulated Level B chemical suit</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Emergency Alert Portal Logic -->
+    <script src="/dashboard/alerts.js?v=10"></script>
+</body>
+</html>
