@@ -177,52 +177,58 @@ class TacticalAlarmEngine {
 
     startWebAudioOscillator() {
         if (this.timer) return;
-        let step = 0;
-        const sirenPattern = [960, 760, 960, 760, 960, 760];
 
-        const playTone = () => {
+        const playTemporal3 = () => {
             if (!this.isPlaying || this.isMuted || !this.ctx || this.ctx.state !== 'running') {
-                if (this.timer) clearTimeout(this.timer);
+                if (this.timer) clearInterval(this.timer);
                 this.timer = null;
                 return;
             }
 
-            if (step >= sirenPattern.length) {
-                step = 0;
-                this.timer = setTimeout(playTone, 380);
-                return;
-            }
-
             try {
-                const freq = sirenPattern[step];
-                const duration = 0.28;
                 const now = this.ctx.currentTime;
+                // Standard ISO 8201 / NFPA 72 Temporal-3: 3 distinct 0.5s horn blasts
+                for (let i = 0; i < 3; i++) {
+                    const start = now + (i * 1.0);
+                    const duration = 0.50;
+                    const stop = start + duration;
 
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
+                    const pulseGain = this.ctx.createGain();
+                    pulseGain.gain.setValueAtTime(0.0001, start);
+                    pulseGain.gain.linearRampToValueAtTime(0.35, start + 0.012);
+                    pulseGain.gain.setValueAtTime(0.35, stop - 0.015);
+                    pulseGain.gain.linearRampToValueAtTime(0.0001, stop);
 
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(freq, now);
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = "bandpass";
+                    filter.frequency.setValueAtTime(1050, start);
+                    filter.Q.setValueAtTime(2.2, start);
 
-                gain.gain.setValueAtTime(0.001, now);
-                gain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
-                gain.gain.setValueAtTime(0.25, now + duration - 0.04);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                    const osc1 = this.ctx.createOscillator();
+                    osc1.type = "sawtooth";
+                    osc1.frequency.setValueAtTime(920, start);
 
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
+                    const osc2 = this.ctx.createOscillator();
+                    osc2.type = "square";
+                    osc2.frequency.setValueAtTime(980, start);
 
-                osc.start(now);
-                osc.stop(now + duration);
+                    osc1.connect(filter);
+                    osc2.connect(filter);
+                    filter.connect(pulseGain);
+                    pulseGain.connect(this.ctx.destination);
 
-                step++;
-                this.timer = setTimeout(playTone, duration * 1000);
+                    osc1.start(start);
+                    osc2.start(start);
+                    osc1.stop(stop + 0.02);
+                    osc2.stop(stop + 0.02);
+                }
             } catch (e) {
                 // Ignore Web Audio errors
             }
         };
 
-        playTone();
+        playTemporal3();
+        this.timer = setInterval(playTemporal3, 4000); // Repeat every 4 seconds
     }
 
     stopAlarm() {

@@ -60,76 +60,123 @@
             return this.audioContext;
         },
 
-        // Play ONLY the Industrial Evacuation Hooter (Deep steady horn blast, NO pitch-wobble/tee-tuu)
-        playCriticalHooter() {
+        // Play ONLY the Globally Recognizable Fire Alarm (ISO 8201 / NFPA 72 Temporal-3 Pattern)
+        // Cadence: 3 urgent horn blasts (0.5s ON, 0.5s OFF, 0.5s ON, 0.5s OFF, 0.5s ON, 1.5s PAUSE)
+        // Sound: Standard 920 Hz & 980 Hz dual-frequency resonant electronic fire alarm horn
+        playCriticalFireAlarm() {
             if (this.isMutedByUser) {
                 this.updateUI();
                 return;
             }
-            // If already actively sounding the evacuation hooter, don't duplicate
-            if (this.currentMode === "CRITICAL_HOOTER" && this.hooterTimer) {
+            if (this.currentMode === "CRITICAL_FIRE_ALARM" && (this.hooterTimer || this.isAudioElementPlaying)) {
                 return;
             }
 
-            // Strictly stop ANY existing sound before starting
+            // Strictly stop ANY existing sound before starting new alarm
             this.stopAll(false);
-            this.currentMode = "CRITICAL_HOOTER";
+            this.currentMode = "CRITICAL_FIRE_ALARM";
 
-            const triggerHooterBlast = () => {
-                if (this.currentMode !== "CRITICAL_HOOTER" || this.isMutedByUser) return;
-                const ctx = this.ensureAudioContext();
-                if (!ctx) return;
-
-                if (ctx.state === "suspended") {
-                    ctx.resume().catch(() => {
-                        this.isAutoplayBlocked = true;
+            // Method 1: HTML5 Audio Element playing authentic alert_siren.wav (Temporal-3 Fire Alarm)
+            const audioEl = document.getElementById("emergency-siren-audio");
+            let htmlAudioStarted = false;
+            if (audioEl) {
+                audioEl.volume = 0.95;
+                audioEl.loop = true;
+                const playPromise = audioEl.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        this.isAudioElementPlaying = true;
                         this.updateUI();
+                    }).catch(() => {
+                        // If browser autoplay policy blocks un-interacted HTML5 audio,
+                        // fallback seamlessly to Web Audio API synthesizer
+                        this.isAudioElementPlaying = false;
+                        startWebAudioTemporal3();
                     });
+                    htmlAudioStarted = true;
                 }
+            }
 
-                try {
-                    const now = ctx.currentTime;
-                    const blastDuration = 1.0; // 1.0 second steady horn blast
+            // Method 2: Web Audio API Synthesizer (Exact ISO 8201 / NFPA 72 Temporal-3 Sounder)
+            const startWebAudioTemporal3 = () => {
+                if (this.hooterTimer || this.isAudioElementPlaying) return;
 
-                    // Heavy acoustic horn gain envelope
-                    const gainNode = ctx.createGain();
-                    gainNode.gain.setValueAtTime(0.001, now);
-                    gainNode.gain.linearRampToValueAtTime(0.35, now + 0.04);
-                    gainNode.gain.setValueAtTime(0.35, now + blastDuration - 0.05);
-                    gainNode.gain.linearRampToValueAtTime(0.001, now + blastDuration);
+                const triggerT3BlastCycle = () => {
+                    if (this.currentMode !== "CRITICAL_FIRE_ALARM" || this.isMutedByUser) return;
+                    const ctx = this.ensureAudioContext();
+                    if (!ctx) return;
 
-                    // Lowpass filter for deep acoustic diaphragm resonance (removes all high screeching)
-                    const filter = ctx.createBiquadFilter();
-                    filter.type = "lowpass";
-                    filter.frequency.setValueAtTime(1100, now);
-                    filter.Q.setValueAtTime(1.8, now);
+                    if (ctx.state === "suspended") {
+                        ctx.resume().catch(() => {
+                            this.isAutoplayBlocked = true;
+                            this.updateUI();
+                        });
+                    }
 
-                    // Primary Horn: Steady 360 Hz (NO frequency modulation, NO pitch shift, NO tee-tuu)
-                    const osc = ctx.createOscillator();
-                    osc.type = "sawtooth";
-                    osc.frequency.setValueAtTime(360, now);
+                    try {
+                        const now = ctx.currentTime;
+                        // Temporal-3: 3 distinct 0.50-second horn pulses at intervals of 1.0 second
+                        for (let i = 0; i < 3; i++) {
+                            const start = now + (i * 1.0);
+                            const duration = 0.50;
+                            const stop = start + duration;
 
-                    // Sub-octave resonance: 180 Hz for heavy industrial diaphragm body
-                    const subOsc = ctx.createOscillator();
-                    subOsc.type = "triangle";
-                    subOsc.frequency.setValueAtTime(180, now);
+                            // Master Pulse Envelope: Sharp 10ms attack, snappy release
+                            const pulseGain = ctx.createGain();
+                            pulseGain.gain.setValueAtTime(0.0001, start);
+                            pulseGain.gain.linearRampToValueAtTime(0.38, start + 0.012);
+                            pulseGain.gain.setValueAtTime(0.38, stop - 0.015);
+                            pulseGain.gain.linearRampToValueAtTime(0.0001, stop);
 
-                    osc.connect(filter);
-                    subOsc.connect(filter);
-                    filter.connect(gainNode);
-                    gainNode.connect(ctx.destination);
+                            // Resonant horn filter: 1050 Hz bandpass (matches standard building alarm enclosures)
+                            const filter = ctx.createBiquadFilter();
+                            filter.type = "bandpass";
+                            filter.frequency.setValueAtTime(1050, start);
+                            filter.Q.setValueAtTime(2.2, start);
 
-                    osc.start(now);
-                    subOsc.start(now);
-                    osc.stop(now + blastDuration + 0.02);
-                    subOsc.stop(now + blastDuration + 0.02);
-                } catch (err) {
-                    console.warn("Hooter blast error:", err);
-                }
+                            // Tone 1: 920 Hz Sawtooth
+                            const osc1 = ctx.createOscillator();
+                            osc1.type = "sawtooth";
+                            osc1.frequency.setValueAtTime(920, start);
+
+                            // Tone 2: 980 Hz Square (Classic fire alarm horn dissonant beating)
+                            const osc2 = ctx.createOscillator();
+                            osc2.type = "square";
+                            osc2.frequency.setValueAtTime(980, start);
+
+                            // Tone 3: High overtone (2800 Hz) for smoke-piercing emergency horn acoustic
+                            const osc3 = ctx.createOscillator();
+                            osc3.type = "sine";
+                            osc3.frequency.setValueAtTime(2850, start);
+                            const gain3 = ctx.createGain();
+                            gain3.gain.setValueAtTime(0.12, start);
+
+                            osc1.connect(filter);
+                            osc2.connect(filter);
+                            osc3.connect(gain3);
+                            gain3.connect(pulseGain);
+                            filter.connect(pulseGain);
+                            pulseGain.connect(ctx.destination);
+
+                            osc1.start(start);
+                            osc2.start(start);
+                            osc3.start(start);
+                            osc1.stop(stop + 0.02);
+                            osc2.stop(stop + 0.02);
+                            osc3.stop(stop + 0.02);
+                        }
+                    } catch (err) {
+                        console.warn("Temporal-3 fire alarm error:", err);
+                    }
+                };
+
+                triggerT3BlastCycle();
+                this.hooterTimer = setInterval(triggerT3BlastCycle, 4000); // 4.0s ISO-8201 cycle (2.5s pulses + 1.5s pause)
             };
 
-            triggerHooterBlast();
-            this.hooterTimer = setInterval(triggerHooterBlast, 1350); // Steady 1.0s blast with 0.35s breath
+            if (!htmlAudioStarted) {
+                startWebAudioTemporal3();
+            }
             this.updateUI();
         },
 
@@ -229,8 +276,8 @@
             const threat = data.threat_level; // 'CRITICAL DANGER' | 'HIGH THREAT' | 'MONITORING ADVISORY' | 'SAFE ZONE' | 'STANDBY'
 
             if (threat === "CRITICAL DANGER" || threat === "HIGH THREAT") {
-                // Critical Zone: Play ONLY the Industrial Evacuation Hooter
-                this.playCriticalHooter();
+                // Critical Zone: Play ONLY the Recognizable Fire Alarm
+                this.playCriticalFireAlarm();
             } else if (threat === "MONITORING ADVISORY") {
                 // Moderate Zone: Play ONLY the Warning Beep
                 this.playModerateBeep();
@@ -246,18 +293,18 @@
             const toggleBtn = document.getElementById("btn-alarm-toggle");
             const bannerSirenBtn = document.getElementById("banner-siren-btn");
 
-            if (this.currentMode === "CRITICAL_HOOTER") {
-                if (btnText) btnText.textContent = "🚨 STOP HOOTER";
+            if (this.currentMode === "CRITICAL_FIRE_ALARM") {
+                if (btnText) btnText.textContent = "🚨 STOP FIRE ALARM";
                 if (btnIcon) btnIcon.textContent = "🔇";
                 if (toggleBtn) {
                     toggleBtn.style.background = "linear-gradient(135deg, #ef4444, #dc2626)";
                     toggleBtn.style.borderColor = "#ffffff";
                     toggleBtn.style.color = "#ffffff";
                     toggleBtn.style.animation = "alertPulse 0.9s infinite alternate";
-                    toggleBtn.title = "Critical Evacuation Hooter is sounding. Click to stop alarm.";
+                    toggleBtn.title = "Critical Fire Alarm is sounding. Click to stop alarm.";
                 }
                 if (bannerSirenBtn) {
-                    bannerSirenBtn.textContent = "🔇 Stop Hooter";
+                    bannerSirenBtn.textContent = "🔇 Stop Fire Alarm";
                     bannerSirenBtn.style.background = "#ef4444";
                     bannerSirenBtn.style.borderColor = "#ffffff";
                 }
@@ -281,7 +328,7 @@
                 if (this.isMutedByUser) {
                     const threat = currentAlertData ? currentAlertData.threat_level : "";
                     const isCrit = threat === "CRITICAL DANGER" || threat === "HIGH THREAT";
-                    if (btnText) btnText.textContent = isCrit ? "🚨 RESUME HOOTER" : "⚠️ RESUME BEEP";
+                    if (btnText) btnText.textContent = isCrit ? "🚨 RESUME FIRE ALARM" : "⚠️ RESUME BEEP";
                     if (btnIcon) btnIcon.textContent = "🔊";
                     if (toggleBtn) {
                         toggleBtn.style.background = "rgba(239, 68, 68, 0.2)";
@@ -291,7 +338,7 @@
                         toggleBtn.title = "Alarm was stopped by user. Click to resume sounding.";
                     }
                     if (bannerSirenBtn) {
-                        bannerSirenBtn.textContent = isCrit ? "🔊 Resume Hooter" : "🔊 Resume Beep";
+                        bannerSirenBtn.textContent = isCrit ? "🔊 Resume Fire Alarm" : "🔊 Resume Beep";
                         bannerSirenBtn.style.background = "rgba(0,0,0,0.5)";
                         bannerSirenBtn.style.borderColor = "rgba(255,255,255,0.4)";
                     }
