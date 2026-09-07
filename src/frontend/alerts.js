@@ -27,19 +27,17 @@
     let searchDebounceTimer = null;
     const STORAGE_KEY_CHECKED = "sih_evac_checked_steps_v1";
 
-    // ── Tactical Emergency Sound Engine (Strict Single-Alarm Pipeline) ────────
+    // ── Tactical Emergency Sound Engine (Industrial Horn Hooter & Single Beep) ─
     const EmergencySoundSystem = {
         audioContext: null,
         currentMode: "SILENT", // 'CRITICAL_HOOTER' | 'MODERATE_BEEP' | 'SILENT'
         isMutedByUser: false,
         isAutoplayBlocked: false,
+        hooterTimer: null,
         beepTimer: null,
-        hooterOsc: null,
-        hooterLfo: null,
-        hooterGain: null,
 
         init() {
-            // Ensure any legacy audio element is paused and reset to silence
+            // Guarantee any legacy audio element is paused and reset to silence
             const el = document.getElementById("emergency-siren-audio");
             if (el) {
                 try {
@@ -62,25 +60,26 @@
             return this.audioContext;
         },
 
-        // Play ONLY ONE alarm: The Critical Evacuation Hooter
+        // Play ONLY the Industrial Evacuation Hooter (Deep steady horn blast, NO pitch-wobble/tee-tuu)
         playCriticalHooter() {
             if (this.isMutedByUser) {
                 this.updateUI();
                 return;
             }
-            // If already sounding the evacuation hooter, don't restart or stack multiple alarms
-            if (this.currentMode === "CRITICAL_HOOTER" && this.hooterOsc) {
+            // If already actively sounding the evacuation hooter, don't duplicate
+            if (this.currentMode === "CRITICAL_HOOTER" && this.hooterTimer) {
                 return;
             }
 
-            // Strictly stop ANY and ALL existing sounds before starting
+            // Strictly stop ANY existing sound before starting
             this.stopAll(false);
             this.currentMode = "CRITICAL_HOOTER";
 
-            const ctx = this.ensureAudioContext();
-            if (!ctx) return;
+            const triggerHooterBlast = () => {
+                if (this.currentMode !== "CRITICAL_HOOTER" || this.isMutedByUser) return;
+                const ctx = this.ensureAudioContext();
+                if (!ctx) return;
 
-            try {
                 if (ctx.state === "suspended") {
                     ctx.resume().catch(() => {
                         this.isAutoplayBlocked = true;
@@ -88,63 +87,67 @@
                     });
                 }
 
-                // Single Master Gain node for clean envelope
-                this.hooterGain = ctx.createGain();
-                this.hooterGain.gain.setValueAtTime(0.001, ctx.currentTime);
-                this.hooterGain.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 0.25);
+                try {
+                    const now = ctx.currentTime;
+                    const blastDuration = 1.0; // 1.0 second steady horn blast
 
-                // Lowpass filter for deep acoustic horn resonance (1800 Hz)
-                const filter = ctx.createBiquadFilter();
-                filter.type = "lowpass";
-                filter.frequency.setValueAtTime(1800, ctx.currentTime);
-                filter.Q.setValueAtTime(2.2, ctx.currentTime);
+                    // Heavy acoustic horn gain envelope
+                    const gainNode = ctx.createGain();
+                    gainNode.gain.setValueAtTime(0.001, now);
+                    gainNode.gain.linearRampToValueAtTime(0.35, now + 0.04);
+                    gainNode.gain.setValueAtTime(0.35, now + blastDuration - 0.05);
+                    gainNode.gain.linearRampToValueAtTime(0.001, now + blastDuration);
 
-                // Single continuous LFO (Low-Frequency Oscillator) for wailing horn sweep
-                this.hooterLfo = ctx.createOscillator();
-                this.hooterLfo.type = "triangle";
-                this.hooterLfo.frequency.setValueAtTime(0.44, ctx.currentTime); // ~2.27 sec wail period
+                    // Lowpass filter for deep acoustic diaphragm resonance (removes all high screeching)
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = "lowpass";
+                    filter.frequency.setValueAtTime(1100, now);
+                    filter.Q.setValueAtTime(1.8, now);
 
-                const lfoGain = ctx.createGain();
-                lfoGain.gain.setValueAtTime(180, ctx.currentTime); // 520 Hz +/- 180 Hz -> 340 to 700 Hz
+                    // Primary Horn: Steady 360 Hz (NO frequency modulation, NO pitch shift, NO tee-tuu)
+                    const osc = ctx.createOscillator();
+                    osc.type = "sawtooth";
+                    osc.frequency.setValueAtTime(360, now);
 
-                this.hooterLfo.connect(lfoGain);
+                    // Sub-octave resonance: 180 Hz for heavy industrial diaphragm body
+                    const subOsc = ctx.createOscillator();
+                    subOsc.type = "triangle";
+                    subOsc.frequency.setValueAtTime(180, now);
 
-                // Single Horn Oscillator (Sawtooth wave for authentic evacuation wail)
-                this.hooterOsc = ctx.createOscillator();
-                this.hooterOsc.type = "sawtooth";
-                this.hooterOsc.frequency.setValueAtTime(520, ctx.currentTime);
-                lfoGain.connect(this.hooterOsc.frequency);
+                    osc.connect(filter);
+                    subOsc.connect(filter);
+                    filter.connect(gainNode);
+                    gainNode.connect(ctx.destination);
 
-                // Connect single pipeline: Osc -> Filter -> MasterGain -> Destination
-                this.hooterOsc.connect(filter);
-                filter.connect(this.hooterGain);
-                this.hooterGain.connect(ctx.destination);
+                    osc.start(now);
+                    subOsc.start(now);
+                    osc.stop(now + blastDuration + 0.02);
+                    subOsc.stop(now + blastDuration + 0.02);
+                } catch (err) {
+                    console.warn("Hooter blast error:", err);
+                }
+            };
 
-                this.hooterLfo.start();
-                this.hooterOsc.start();
-            } catch (err) {
-                console.warn("Evacuation hooter error:", err);
-            }
-
+            triggerHooterBlast();
+            this.hooterTimer = setInterval(triggerHooterBlast, 1350); // Steady 1.0s blast with 0.35s breath
             this.updateUI();
         },
 
-        // Play ONLY ONE alarm: The Moderate Advisory Beep
+        // Play ONLY the Moderate Advisory Beep (Single clean beep, NO tee-tuu)
         playModerateBeep() {
             if (this.isMutedByUser) {
                 this.updateUI();
                 return;
             }
-            // If already sounding the advisory beep, don't restart or stack
             if (this.currentMode === "MODERATE_BEEP" && this.beepTimer) {
                 return;
             }
 
-            // Strictly stop ANY and ALL existing sounds before starting
+            // Strictly stop ANY existing sound before starting
             this.stopAll(false);
             this.currentMode = "MODERATE_BEEP";
 
-            const triggerBeepPulse = () => {
+            const triggerBeep = () => {
                 if (this.currentMode !== "MODERATE_BEEP" || this.isMutedByUser) return;
                 const ctx = this.ensureAudioContext();
                 if (!ctx) return;
@@ -158,35 +161,30 @@
 
                 try {
                     const now = ctx.currentTime;
-                    const playSingleTone = (startTime) => {
-                        const osc = ctx.createOscillator();
-                        const gain = ctx.createGain();
-                        osc.type = "sine";
-                        osc.frequency.setValueAtTime(880, startTime); // A5 pure advisory beep
-                        gain.gain.setValueAtTime(0.001, startTime);
-                        gain.gain.linearRampToValueAtTime(0.25, startTime + 0.015);
-                        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.11);
+                    // Single clean advisory beep: 700 Hz, 85ms duration
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(700, now);
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.20, now + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
 
-                        osc.connect(gain);
-                        gain.connect(ctx.destination);
-                        osc.start(startTime);
-                        osc.stop(startTime + 0.12);
-                    };
-
-                    // Clean double-beep alert: Beep ... Beep
-                    playSingleTone(now);
-                    playSingleTone(now + 0.16);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.095);
                 } catch (e) {
-                    console.warn("Beep audio error:", e);
+                    console.warn("Beep sound error:", e);
                 }
             };
 
-            triggerBeepPulse();
-            this.beepTimer = setInterval(triggerBeepPulse, 1500); // Pulse once every 1.5 seconds
+            triggerBeep();
+            this.beepTimer = setInterval(triggerBeep, 1600); // Pulse single calm beep every 1.6s
             this.updateUI();
         },
 
-        // Completely stop and tear down all sound pipelines immediately
+        // Completely stop and tear down all sound immediately
         stopAll(userInitiated = false) {
             if (userInitiated) {
                 this.isMutedByUser = true;
@@ -194,45 +192,25 @@
 
             this.currentMode = "SILENT";
 
-            // 1. Halt any audio element
+            // 1. Clear hooter interval
+            if (this.hooterTimer) {
+                clearInterval(this.hooterTimer);
+                this.hooterTimer = null;
+            }
+
+            // 2. Clear beep interval
+            if (this.beepTimer) {
+                clearInterval(this.beepTimer);
+                this.beepTimer = null;
+            }
+
+            // 3. Halt legacy audio element
             const el = document.getElementById("emergency-siren-audio");
             if (el) {
                 try {
                     el.pause();
                     el.currentTime = 0;
                 } catch (e) {}
-            }
-
-            // 2. Halt evacuation hooter oscillator
-            if (this.hooterOsc) {
-                try {
-                    this.hooterOsc.stop();
-                    this.hooterOsc.disconnect();
-                } catch (e) {}
-                this.hooterOsc = null;
-            }
-
-            // 3. Halt LFO
-            if (this.hooterLfo) {
-                try {
-                    this.hooterLfo.stop();
-                    this.hooterLfo.disconnect();
-                } catch (e) {}
-                this.hooterLfo = null;
-            }
-
-            // 4. Disconnect master gain
-            if (this.hooterGain) {
-                try {
-                    this.hooterGain.disconnect();
-                } catch (e) {}
-                this.hooterGain = null;
-            }
-
-            // 5. Clear advisory beep timer
-            if (this.beepTimer) {
-                clearInterval(this.beepTimer);
-                this.beepTimer = null;
             }
 
             this.updateUI();
@@ -251,10 +229,10 @@
             const threat = data.threat_level; // 'CRITICAL DANGER' | 'HIGH THREAT' | 'MONITORING ADVISORY' | 'SAFE ZONE' | 'STANDBY'
 
             if (threat === "CRITICAL DANGER" || threat === "HIGH THREAT") {
-                // Critical Zone: Play ONLY the Evacuation Hooter (never multiple alarms)
+                // Critical Zone: Play ONLY the Industrial Evacuation Hooter
                 this.playCriticalHooter();
             } else if (threat === "MONITORING ADVISORY") {
-                // Moderate Zone: Play ONLY the Warning Beep (never multiple alarms)
+                // Moderate Zone: Play ONLY the Warning Beep
                 this.playModerateBeep();
             } else {
                 // Safe Zone / Standby: Complete Silence
