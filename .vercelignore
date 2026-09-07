@@ -1,0 +1,52 @@
+# ==========================================
+# Vercel Deployment Ignore Rules (.vercelignore)
+# Prevents uploading heavy offline assets, caches & ML artifacts
+# ==========================================
+
+# 1. Virtual environments & bytecodes (Save ~1.1 GB)
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.DS_Store
+
+# 2. Local Environment files
+.env
+.env.local
+
+# 3. Heavy visual media & screenshots (Save 29 MB)
+assets/
+assets/**
+
+# 4. Local tile caches & temp query caches (Save 20 MB)
+cache/
+cache/**
+
+# 5. Raw satellite data & offline synthetic training data (Save ~10 MB)
+data/raw/
+data/raw/**
+data/processed/*.csv
+data/processed/merged_hotspots.geojson
+
+# 6. Jupyter Notebooks
+notebooks/
+notebooks/**
+*.ipynb
+
+# 7. Offline ML training pipelines (API only reads processed geojson)
+run_pipeline.py
+src/data/
+src/features/
+src/models/
+
+# 8. Markdown reports & documentation
+*.md
+industrial_fire_detection_report.md
+system_requirements.md
+
+# 9. Version Control
+.git/
+.gitignore

@@ -25,6 +25,13 @@ matplotlib>=3.7
 seaborn>=0.12
 jupyter>=1.0
 
-# Deep Learning / Advanced Vision
+# Deep Learning & Computer Vision
 torch>=2.0.0
 torchvision>=0.15.0
+opencv-python-headless>=4.8.0
+pillow>=10.0.0
+
+# Geocoding & Masking
+global-land-mask>=1.0.0
+reverse-geocode>=1.4.1
+
