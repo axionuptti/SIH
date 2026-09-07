@@ -27,21 +27,26 @@
     let searchDebounceTimer = null;
     const STORAGE_KEY_CHECKED = "sih_evac_checked_steps_v1";
 
-    // ── Tactical Emergency Sound Engine (Hooter / Beep / Silence) ────────────
+    // ── Tactical Emergency Sound Engine (Strict Single-Alarm Pipeline) ────────
     const EmergencySoundSystem = {
         audioContext: null,
         currentMode: "SILENT", // 'CRITICAL_HOOTER' | 'MODERATE_BEEP' | 'SILENT'
         isMutedByUser: false,
         isAutoplayBlocked: false,
         beepTimer: null,
-        hooterOscPrimary: null,
-        hooterOscSecondary: null,
+        hooterOsc: null,
         hooterLfo: null,
         hooterGain: null,
-        audioElement: null,
 
         init() {
-            this.audioElement = document.getElementById("emergency-siren-audio");
+            // Ensure any legacy audio element is paused and reset to silence
+            const el = document.getElementById("emergency-siren-audio");
+            if (el) {
+                try {
+                    el.pause();
+                    el.currentTime = 0;
+                } catch (e) {}
+            }
         },
 
         ensureAudioContext() {
@@ -57,40 +62,23 @@
             return this.audioContext;
         },
 
+        // Play ONLY ONE alarm: The Critical Evacuation Hooter
         playCriticalHooter() {
             if (this.isMutedByUser) {
                 this.updateUI();
                 return;
             }
-            if (this.currentMode === "CRITICAL_HOOTER") return; // Already running continuous hooter
+            // If already sounding the evacuation hooter, don't restart or stack multiple alarms
+            if (this.currentMode === "CRITICAL_HOOTER" && this.hooterOsc) {
+                return;
+            }
 
+            // Strictly stop ANY and ALL existing sounds before starting
             this.stopAll(false);
             this.currentMode = "CRITICAL_HOOTER";
 
-            // 1. Play recorded industrial evacuation siren wav file on loop
-            if (this.audioElement) {
-                this.audioElement.currentTime = 0;
-                this.audioElement.loop = true;
-                this.audioElement.volume = 1.0;
-                const playPromise = this.audioElement.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch((err) => {
-                        console.warn("Audio element autoplay restricted:", err);
-                        this.isAutoplayBlocked = true;
-                        this.updateUI();
-                    });
-                }
-            }
-
-            // 2. Synthesize continuous heavy industrial evacuation hooter (dual-tone wailing horn with LFO)
-            this.startSynthesizedHooter();
-            this.updateUI();
-        },
-
-        startSynthesizedHooter() {
             const ctx = this.ensureAudioContext();
             if (!ctx) return;
-            if (this.hooterOscPrimary) return;
 
             try {
                 if (ctx.state === "suspended") {
@@ -100,68 +88,63 @@
                     });
                 }
 
-                // Master Gain for Hooter with smooth ramp-in
+                // Single Master Gain node for clean envelope
                 this.hooterGain = ctx.createGain();
                 this.hooterGain.gain.setValueAtTime(0.001, ctx.currentTime);
-                this.hooterGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.3);
+                this.hooterGain.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 0.25);
 
-                // Lowpass acoustic resonance filter
+                // Lowpass filter for deep acoustic horn resonance (1800 Hz)
                 const filter = ctx.createBiquadFilter();
                 filter.type = "lowpass";
-                filter.frequency.setValueAtTime(2200, ctx.currentTime);
-                filter.Q.setValueAtTime(2.0, ctx.currentTime);
+                filter.frequency.setValueAtTime(1800, ctx.currentTime);
+                filter.Q.setValueAtTime(2.2, ctx.currentTime);
 
-                // Continuous LFO for infinite wailing sweep without expiration
+                // Single continuous LFO (Low-Frequency Oscillator) for wailing horn sweep
                 this.hooterLfo = ctx.createOscillator();
                 this.hooterLfo.type = "triangle";
-                this.hooterLfo.frequency.setValueAtTime(0.42, ctx.currentTime); // 2.4 sec wail period
+                this.hooterLfo.frequency.setValueAtTime(0.44, ctx.currentTime); // ~2.27 sec wail period
 
-                const lfoGain1 = ctx.createGain();
-                lfoGain1.gain.setValueAtTime(230, ctx.currentTime); // 580 Hz +/- 230 Hz -> 350 to 810 Hz
+                const lfoGain = ctx.createGain();
+                lfoGain.gain.setValueAtTime(180, ctx.currentTime); // 520 Hz +/- 180 Hz -> 340 to 700 Hz
 
-                const lfoGain2 = ctx.createGain();
-                lfoGain2.gain.setValueAtTime(170, ctx.currentTime); // 435 Hz +/- 170 Hz -> 265 to 605 Hz
+                this.hooterLfo.connect(lfoGain);
 
-                this.hooterLfo.connect(lfoGain1);
-                this.hooterLfo.connect(lfoGain2);
+                // Single Horn Oscillator (Sawtooth wave for authentic evacuation wail)
+                this.hooterOsc = ctx.createOscillator();
+                this.hooterOsc.type = "sawtooth";
+                this.hooterOsc.frequency.setValueAtTime(520, ctx.currentTime);
+                lfoGain.connect(this.hooterOsc.frequency);
 
-                // Horn 1: Sawtooth (Main cutting evacuation wail)
-                this.hooterOscPrimary = ctx.createOscillator();
-                this.hooterOscPrimary.type = "sawtooth";
-                this.hooterOscPrimary.frequency.setValueAtTime(580, ctx.currentTime);
-                lfoGain1.connect(this.hooterOscPrimary.frequency);
-
-                // Horn 2: Square wave (Sub-harmonic 4:3 industrial acoustic body)
-                this.hooterOscSecondary = ctx.createOscillator();
-                this.hooterOscSecondary.type = "square";
-                this.hooterOscSecondary.frequency.setValueAtTime(435, ctx.currentTime);
-                lfoGain2.connect(this.hooterOscSecondary.frequency);
-
-                // Routing to destination
-                this.hooterOscPrimary.connect(filter);
-                this.hooterOscSecondary.connect(filter);
+                // Connect single pipeline: Osc -> Filter -> MasterGain -> Destination
+                this.hooterOsc.connect(filter);
                 filter.connect(this.hooterGain);
                 this.hooterGain.connect(ctx.destination);
 
                 this.hooterLfo.start();
-                this.hooterOscPrimary.start();
-                this.hooterOscSecondary.start();
+                this.hooterOsc.start();
             } catch (err) {
-                console.warn("Synthesizer error:", err);
+                console.warn("Evacuation hooter error:", err);
             }
+
+            this.updateUI();
         },
 
+        // Play ONLY ONE alarm: The Moderate Advisory Beep
         playModerateBeep() {
             if (this.isMutedByUser) {
                 this.updateUI();
                 return;
             }
-            if (this.currentMode === "MODERATE_BEEP") return; // Already beeping
+            // If already sounding the advisory beep, don't restart or stack
+            if (this.currentMode === "MODERATE_BEEP" && this.beepTimer) {
+                return;
+            }
 
+            // Strictly stop ANY and ALL existing sounds before starting
             this.stopAll(false);
             this.currentMode = "MODERATE_BEEP";
 
-            const triggerPulse = () => {
+            const triggerBeepPulse = () => {
                 if (this.currentMode !== "MODERATE_BEEP" || this.isMutedByUser) return;
                 const ctx = this.ensureAudioContext();
                 if (!ctx) return;
@@ -175,34 +158,35 @@
 
                 try {
                     const now = ctx.currentTime;
-                    const playBeepTone = (startTime) => {
+                    const playSingleTone = (startTime) => {
                         const osc = ctx.createOscillator();
                         const gain = ctx.createGain();
                         osc.type = "sine";
-                        osc.frequency.setValueAtTime(880, startTime); // A5 advisory warning tone
+                        osc.frequency.setValueAtTime(880, startTime); // A5 pure advisory beep
                         gain.gain.setValueAtTime(0.001, startTime);
-                        gain.gain.linearRampToValueAtTime(0.28, startTime + 0.015);
-                        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.12);
+                        gain.gain.linearRampToValueAtTime(0.25, startTime + 0.015);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.11);
 
                         osc.connect(gain);
                         gain.connect(ctx.destination);
                         osc.start(startTime);
-                        osc.stop(startTime + 0.13);
+                        osc.stop(startTime + 0.12);
                     };
 
-                    // Crisp tactical double-beep alert: Beep... Beep... (repeats continuously)
-                    playBeepTone(now);
-                    playBeepTone(now + 0.16);
+                    // Clean double-beep alert: Beep ... Beep
+                    playSingleTone(now);
+                    playSingleTone(now + 0.16);
                 } catch (e) {
                     console.warn("Beep audio error:", e);
                 }
             };
 
-            triggerPulse();
-            this.beepTimer = setInterval(triggerPulse, 1400); // Pulse every 1.4 seconds continuously
+            triggerBeepPulse();
+            this.beepTimer = setInterval(triggerBeepPulse, 1500); // Pulse once every 1.5 seconds
             this.updateUI();
         },
 
+        // Completely stop and tear down all sound pipelines immediately
         stopAll(userInitiated = false) {
             if (userInitiated) {
                 this.isMutedByUser = true;
@@ -210,29 +194,25 @@
 
             this.currentMode = "SILENT";
 
-            // Stop physical audio element
-            if (this.audioElement) {
+            // 1. Halt any audio element
+            const el = document.getElementById("emergency-siren-audio");
+            if (el) {
                 try {
-                    this.audioElement.pause();
-                    this.audioElement.currentTime = 0;
+                    el.pause();
+                    el.currentTime = 0;
                 } catch (e) {}
             }
 
-            // Stop synthesized evacuation hooter oscillators & LFO
-            if (this.hooterOscPrimary) {
+            // 2. Halt evacuation hooter oscillator
+            if (this.hooterOsc) {
                 try {
-                    this.hooterOscPrimary.stop();
-                    this.hooterOscPrimary.disconnect();
+                    this.hooterOsc.stop();
+                    this.hooterOsc.disconnect();
                 } catch (e) {}
-                this.hooterOscPrimary = null;
+                this.hooterOsc = null;
             }
-            if (this.hooterOscSecondary) {
-                try {
-                    this.hooterOscSecondary.stop();
-                    this.hooterOscSecondary.disconnect();
-                } catch (e) {}
-                this.hooterOscSecondary = null;
-            }
+
+            // 3. Halt LFO
             if (this.hooterLfo) {
                 try {
                     this.hooterLfo.stop();
@@ -240,6 +220,8 @@
                 } catch (e) {}
                 this.hooterLfo = null;
             }
+
+            // 4. Disconnect master gain
             if (this.hooterGain) {
                 try {
                     this.hooterGain.disconnect();
@@ -247,7 +229,7 @@
                 this.hooterGain = null;
             }
 
-            // Stop alert beep interval
+            // 5. Clear advisory beep timer
             if (this.beepTimer) {
                 clearInterval(this.beepTimer);
                 this.beepTimer = null;
@@ -263,18 +245,19 @@
             this.evaluate(data);
         },
 
+        // Central Single-Source Decision Engine
         evaluate(data) {
             if (!data) return;
             const threat = data.threat_level; // 'CRITICAL DANGER' | 'HIGH THREAT' | 'MONITORING ADVISORY' | 'SAFE ZONE' | 'STANDBY'
 
             if (threat === "CRITICAL DANGER" || threat === "HIGH THREAT") {
-                // Critical Zone: Play Evacuation Hooter continuously until stopped
+                // Critical Zone: Play ONLY the Evacuation Hooter (never multiple alarms)
                 this.playCriticalHooter();
             } else if (threat === "MONITORING ADVISORY") {
-                // Moderate Zone: Play Warning Alert Beep continuously until stopped
+                // Moderate Zone: Play ONLY the Warning Beep (never multiple alarms)
                 this.playModerateBeep();
             } else {
-                // Safe Zone: Complete silence!
+                // Safe Zone / Standby: Complete Silence
                 this.stopAll(false);
             }
         },
@@ -368,6 +351,9 @@
             if (currentAlertData && EmergencySoundSystem.currentMode === "SILENT" && !EmergencySoundSystem.isMutedByUser) {
                 EmergencySoundSystem.evaluate(currentAlertData);
             }
+            document.removeEventListener("click", unlockAudio);
+            document.removeEventListener("keydown", unlockAudio);
+            document.removeEventListener("touchstart", unlockAudio);
         };
 
         document.addEventListener("click", unlockAudio, { passive: true });
