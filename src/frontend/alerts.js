@@ -353,11 +353,12 @@
             attributionControl: false
         }).setView([currentLat, currentLon], 10);
 
-        // Dark Matter Basemap (Matches Main Dashboard)
+        // Dark Matter Basemap with Authenticated CARTO Key (Eliminates Watermark)
         const BASEMAPS_API_KEY = "cb1_2zsc_1_6906339c23d46ebbaf5c5c8c";
-        L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${BASEMAPS_API_KEY}`, {
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${BASEMAPS_API_KEY}`, {
             maxZoom: 18,
-            subdomains: "abcd"
+            subdomains: "abcd",
+            attribution: "&copy; CARTO &copy; OpenStreetMap"
         }).addTo(map);
 
         smokePlumeLayer = L.layerGroup().addTo(map);

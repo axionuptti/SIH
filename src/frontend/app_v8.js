@@ -39,7 +39,7 @@ const satelliteLayer = L.tileLayer(
 // Dark map overlay for hybrid view (contains the map text/labels)
 const BASEMAPS_API_KEY = 'cb1_2zsc_1_6906339c23d46ebbaf5c5c8c';
 const darkOverlay = L.tileLayer(
-    `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?api_key=${BASEMAPS_API_KEY}`,
+    `https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png?key=${BASEMAPS_API_KEY}`,
     { attribution: '&copy; CartoDB', opacity: 0.65, maxZoom: 19 }
 ).addTo(map);
 
