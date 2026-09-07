@@ -99,6 +99,21 @@ body {
     100% { box-shadow: 0 4px 40px rgba(239, 68, 68, 0.85); }
 }
 
+.critical-alert-banner.moderate {
+    background: linear-gradient(90deg, rgba(217, 119, 6, 0.95), rgba(245, 158, 11, 0.9));
+    box-shadow: 0 10px 30px rgba(245, 158, 11, 0.5);
+    animation: alertPulseAmber 2s infinite alternate;
+}
+
+@keyframes alertPulseAmber {
+    0%   { box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4); }
+    100% { box-shadow: 0 4px 40px rgba(245, 158, 11, 0.85); }
+}
+
+.critical-alert-banner.moderate .banner-text span {
+    color: #fef3c7;
+}
+
 .banner-inner {
     display: flex;
     align-items: center;

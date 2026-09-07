@@ -637,14 +637,15 @@ def get_proximity_alerts(
             "structural_cooling": "Wetting agent and water spray applied to fence lines and barn perimeters.",
             "ppe_level": "Flame-retardant coveralls, heavy leather boots, smoke dust mask, and safety goggles."
         }
+    else:
         fire_control = {
-            "incident_type": "No Active Threat in Immediate Sector",
-            "fuel_class": "N/A",
-            "primary_suppressant": "Routine Standby Monitoring",
+            "incident_type": "Standard Thermal Hazard Containment" if closest else "No Active Threat in Immediate Sector",
+            "fuel_class": "Class A / General Combustion" if closest else "N/A",
+            "primary_suppressant": "Water Tender Deluge & Perimeter Wetting Line" if closest else "Routine Standby Monitoring",
             "critical_warning": "Maintain situational vigilance as weather conditions shift.",
-            "containment_perimeter": "Standard municipal hydrant coverage.",
-            "structural_cooling": "N/A",
-            "ppe_level": "Standard station wear."
+            "containment_perimeter": f"Minimum {buffer_km} km standoff perimeter." if closest else "Standard municipal hydrant coverage.",
+            "structural_cooling": "Cool surrounding structures with high-volume spray." if closest else "N/A",
+            "ppe_level": "Standard bunker gear & SCBA." if closest else "Standard station wear."
         }
 
     # ── Projected Toxic Smoke Plume Cone ──

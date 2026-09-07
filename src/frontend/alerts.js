@@ -7,14 +7,13 @@
     "use strict";
 
     // ── Global State ─────────────────────────────────────────────────────────
-    let currentLat = 22.4707;
-    let currentLon = 70.0654;
+    let currentLat = 47.3517;
+    let currentLon = 34.9868;
     let currentRadiusKm = 50;
-    let currentLocationLabel = "Jamnagar Oil Refinery Belt, India";
+    let currentLocationLabel = "Dniprorudne Timber & Industrial Sector";
     
     let activeTab = "civilian"; // 'civilian' | 'responder'
     let isDrawerOpen = false;
-    let isSirenPlaying = false;
     let currentAlertData = null;
 
     let map = null;
@@ -28,14 +27,357 @@
     let searchDebounceTimer = null;
     const STORAGE_KEY_CHECKED = "sih_evac_checked_steps_v1";
 
+    // ── Tactical Emergency Sound Engine (Hooter / Beep / Silence) ────────────
+    const EmergencySoundSystem = {
+        audioContext: null,
+        currentMode: "SILENT", // 'CRITICAL_HOOTER' | 'MODERATE_BEEP' | 'SILENT'
+        isMutedByUser: false,
+        isAutoplayBlocked: false,
+        beepTimer: null,
+        hooterOscPrimary: null,
+        hooterOscSecondary: null,
+        hooterLfo: null,
+        hooterGain: null,
+        audioElement: null,
+
+        init() {
+            this.audioElement = document.getElementById("emergency-siren-audio");
+        },
+
+        ensureAudioContext() {
+            if (!this.audioContext) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    this.audioContext = new AudioCtx();
+                }
+            }
+            if (this.audioContext && this.audioContext.state === "suspended") {
+                this.audioContext.resume().catch(() => {});
+            }
+            return this.audioContext;
+        },
+
+        playCriticalHooter() {
+            if (this.isMutedByUser) {
+                this.updateUI();
+                return;
+            }
+            if (this.currentMode === "CRITICAL_HOOTER") return; // Already running continuous hooter
+
+            this.stopAll(false);
+            this.currentMode = "CRITICAL_HOOTER";
+
+            // 1. Play recorded industrial evacuation siren wav file on loop
+            if (this.audioElement) {
+                this.audioElement.currentTime = 0;
+                this.audioElement.loop = true;
+                this.audioElement.volume = 1.0;
+                const playPromise = this.audioElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch((err) => {
+                        console.warn("Audio element autoplay restricted:", err);
+                        this.isAutoplayBlocked = true;
+                        this.updateUI();
+                    });
+                }
+            }
+
+            // 2. Synthesize continuous heavy industrial evacuation hooter (dual-tone wailing horn with LFO)
+            this.startSynthesizedHooter();
+            this.updateUI();
+        },
+
+        startSynthesizedHooter() {
+            const ctx = this.ensureAudioContext();
+            if (!ctx) return;
+            if (this.hooterOscPrimary) return;
+
+            try {
+                if (ctx.state === "suspended") {
+                    ctx.resume().catch(() => {
+                        this.isAutoplayBlocked = true;
+                        this.updateUI();
+                    });
+                }
+
+                // Master Gain for Hooter with smooth ramp-in
+                this.hooterGain = ctx.createGain();
+                this.hooterGain.gain.setValueAtTime(0.001, ctx.currentTime);
+                this.hooterGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.3);
+
+                // Lowpass acoustic resonance filter
+                const filter = ctx.createBiquadFilter();
+                filter.type = "lowpass";
+                filter.frequency.setValueAtTime(2200, ctx.currentTime);
+                filter.Q.setValueAtTime(2.0, ctx.currentTime);
+
+                // Continuous LFO for infinite wailing sweep without expiration
+                this.hooterLfo = ctx.createOscillator();
+                this.hooterLfo.type = "triangle";
+                this.hooterLfo.frequency.setValueAtTime(0.42, ctx.currentTime); // 2.4 sec wail period
+
+                const lfoGain1 = ctx.createGain();
+                lfoGain1.gain.setValueAtTime(230, ctx.currentTime); // 580 Hz +/- 230 Hz -> 350 to 810 Hz
+
+                const lfoGain2 = ctx.createGain();
+                lfoGain2.gain.setValueAtTime(170, ctx.currentTime); // 435 Hz +/- 170 Hz -> 265 to 605 Hz
+
+                this.hooterLfo.connect(lfoGain1);
+                this.hooterLfo.connect(lfoGain2);
+
+                // Horn 1: Sawtooth (Main cutting evacuation wail)
+                this.hooterOscPrimary = ctx.createOscillator();
+                this.hooterOscPrimary.type = "sawtooth";
+                this.hooterOscPrimary.frequency.setValueAtTime(580, ctx.currentTime);
+                lfoGain1.connect(this.hooterOscPrimary.frequency);
+
+                // Horn 2: Square wave (Sub-harmonic 4:3 industrial acoustic body)
+                this.hooterOscSecondary = ctx.createOscillator();
+                this.hooterOscSecondary.type = "square";
+                this.hooterOscSecondary.frequency.setValueAtTime(435, ctx.currentTime);
+                lfoGain2.connect(this.hooterOscSecondary.frequency);
+
+                // Routing to destination
+                this.hooterOscPrimary.connect(filter);
+                this.hooterOscSecondary.connect(filter);
+                filter.connect(this.hooterGain);
+                this.hooterGain.connect(ctx.destination);
+
+                this.hooterLfo.start();
+                this.hooterOscPrimary.start();
+                this.hooterOscSecondary.start();
+            } catch (err) {
+                console.warn("Synthesizer error:", err);
+            }
+        },
+
+        playModerateBeep() {
+            if (this.isMutedByUser) {
+                this.updateUI();
+                return;
+            }
+            if (this.currentMode === "MODERATE_BEEP") return; // Already beeping
+
+            this.stopAll(false);
+            this.currentMode = "MODERATE_BEEP";
+
+            const triggerPulse = () => {
+                if (this.currentMode !== "MODERATE_BEEP" || this.isMutedByUser) return;
+                const ctx = this.ensureAudioContext();
+                if (!ctx) return;
+
+                if (ctx.state === "suspended") {
+                    ctx.resume().catch(() => {
+                        this.isAutoplayBlocked = true;
+                        this.updateUI();
+                    });
+                }
+
+                try {
+                    const now = ctx.currentTime;
+                    const playBeepTone = (startTime) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = "sine";
+                        osc.frequency.setValueAtTime(880, startTime); // A5 advisory warning tone
+                        gain.gain.setValueAtTime(0.001, startTime);
+                        gain.gain.linearRampToValueAtTime(0.28, startTime + 0.015);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.12);
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(startTime);
+                        osc.stop(startTime + 0.13);
+                    };
+
+                    // Crisp tactical double-beep alert: Beep... Beep... (repeats continuously)
+                    playBeepTone(now);
+                    playBeepTone(now + 0.16);
+                } catch (e) {
+                    console.warn("Beep audio error:", e);
+                }
+            };
+
+            triggerPulse();
+            this.beepTimer = setInterval(triggerPulse, 1400); // Pulse every 1.4 seconds continuously
+            this.updateUI();
+        },
+
+        stopAll(userInitiated = false) {
+            if (userInitiated) {
+                this.isMutedByUser = true;
+            }
+
+            this.currentMode = "SILENT";
+
+            // Stop physical audio element
+            if (this.audioElement) {
+                try {
+                    this.audioElement.pause();
+                    this.audioElement.currentTime = 0;
+                } catch (e) {}
+            }
+
+            // Stop synthesized evacuation hooter oscillators & LFO
+            if (this.hooterOscPrimary) {
+                try {
+                    this.hooterOscPrimary.stop();
+                    this.hooterOscPrimary.disconnect();
+                } catch (e) {}
+                this.hooterOscPrimary = null;
+            }
+            if (this.hooterOscSecondary) {
+                try {
+                    this.hooterOscSecondary.stop();
+                    this.hooterOscSecondary.disconnect();
+                } catch (e) {}
+                this.hooterOscSecondary = null;
+            }
+            if (this.hooterLfo) {
+                try {
+                    this.hooterLfo.stop();
+                    this.hooterLfo.disconnect();
+                } catch (e) {}
+                this.hooterLfo = null;
+            }
+            if (this.hooterGain) {
+                try {
+                    this.hooterGain.disconnect();
+                } catch (e) {}
+                this.hooterGain = null;
+            }
+
+            // Stop alert beep interval
+            if (this.beepTimer) {
+                clearInterval(this.beepTimer);
+                this.beepTimer = null;
+            }
+
+            this.updateUI();
+        },
+
+        unmuteAndReevaluate(data) {
+            this.isMutedByUser = false;
+            this.isAutoplayBlocked = false;
+            this.ensureAudioContext();
+            this.evaluate(data);
+        },
+
+        evaluate(data) {
+            if (!data) return;
+            const threat = data.threat_level; // 'CRITICAL DANGER' | 'HIGH THREAT' | 'MONITORING ADVISORY' | 'SAFE ZONE' | 'STANDBY'
+
+            if (threat === "CRITICAL DANGER" || threat === "HIGH THREAT") {
+                // Critical Zone: Play Evacuation Hooter continuously until stopped
+                this.playCriticalHooter();
+            } else if (threat === "MONITORING ADVISORY") {
+                // Moderate Zone: Play Warning Alert Beep continuously until stopped
+                this.playModerateBeep();
+            } else {
+                // Safe Zone: Complete silence!
+                this.stopAll(false);
+            }
+        },
+
+        updateUI() {
+            const btnText = document.getElementById("alarm-btn-text");
+            const btnIcon = document.getElementById("alarm-btn-icon");
+            const toggleBtn = document.getElementById("btn-alarm-toggle");
+            const bannerSirenBtn = document.getElementById("banner-siren-btn");
+
+            if (this.currentMode === "CRITICAL_HOOTER") {
+                if (btnText) btnText.textContent = "🚨 STOP HOOTER";
+                if (btnIcon) btnIcon.textContent = "🔇";
+                if (toggleBtn) {
+                    toggleBtn.style.background = "linear-gradient(135deg, #ef4444, #dc2626)";
+                    toggleBtn.style.borderColor = "#ffffff";
+                    toggleBtn.style.color = "#ffffff";
+                    toggleBtn.style.animation = "alertPulse 0.9s infinite alternate";
+                    toggleBtn.title = "Critical Evacuation Hooter is sounding. Click to stop alarm.";
+                }
+                if (bannerSirenBtn) {
+                    bannerSirenBtn.textContent = "🔇 Stop Hooter";
+                    bannerSirenBtn.style.background = "#ef4444";
+                    bannerSirenBtn.style.borderColor = "#ffffff";
+                }
+            } else if (this.currentMode === "MODERATE_BEEP") {
+                if (btnText) btnText.textContent = "⚠️ STOP BEEP";
+                if (btnIcon) btnIcon.textContent = "🔇";
+                if (toggleBtn) {
+                    toggleBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+                    toggleBtn.style.borderColor = "#ffffff";
+                    toggleBtn.style.color = "#ffffff";
+                    toggleBtn.style.animation = "alertPulse 1.4s infinite alternate";
+                    toggleBtn.title = "Moderate Warning Alert Beep is sounding. Click to stop alarm.";
+                }
+                if (bannerSirenBtn) {
+                    bannerSirenBtn.textContent = "🔇 Stop Beep";
+                    bannerSirenBtn.style.background = "#f59e0b";
+                    bannerSirenBtn.style.borderColor = "#ffffff";
+                }
+            } else {
+                // SILENT MODE (either Safe Zone or Muted by user)
+                if (this.isMutedByUser) {
+                    const threat = currentAlertData ? currentAlertData.threat_level : "";
+                    const isCrit = threat === "CRITICAL DANGER" || threat === "HIGH THREAT";
+                    if (btnText) btnText.textContent = isCrit ? "🚨 RESUME HOOTER" : "⚠️ RESUME BEEP";
+                    if (btnIcon) btnIcon.textContent = "🔊";
+                    if (toggleBtn) {
+                        toggleBtn.style.background = "rgba(239, 68, 68, 0.2)";
+                        toggleBtn.style.borderColor = isCrit ? "#ef4444" : "#f59e0b";
+                        toggleBtn.style.color = "#f8fafc";
+                        toggleBtn.style.animation = "none";
+                        toggleBtn.title = "Alarm was stopped by user. Click to resume sounding.";
+                    }
+                    if (bannerSirenBtn) {
+                        bannerSirenBtn.textContent = isCrit ? "🔊 Resume Hooter" : "🔊 Resume Beep";
+                        bannerSirenBtn.style.background = "rgba(0,0,0,0.5)";
+                        bannerSirenBtn.style.borderColor = "rgba(255,255,255,0.4)";
+                    }
+                } else {
+                    // Safe Zone / Standby
+                    if (btnText) btnText.textContent = "Alarm: SAFE (Silent)";
+                    if (btnIcon) btnIcon.textContent = "🛡️";
+                    if (toggleBtn) {
+                        toggleBtn.style.background = "rgba(16, 185, 129, 0.15)";
+                        toggleBtn.style.borderColor = "rgba(16, 185, 129, 0.4)";
+                        toggleBtn.style.color = "#a7f3d0";
+                        toggleBtn.style.animation = "none";
+                        toggleBtn.title = "Sector is safe. Emergency sound armed in silent standby.";
+                    }
+                    if (bannerSirenBtn) {
+                        bannerSirenBtn.textContent = "🔊 Test Alarm";
+                        bannerSirenBtn.style.background = "rgba(0,0,0,0.4)";
+                        bannerSirenBtn.style.borderColor = "rgba(255,255,255,0.2)";
+                    }
+                }
+            }
+        }
+    };
+
     // ── Initialization ───────────────────────────────────────────────────────
     document.addEventListener("DOMContentLoaded", () => {
+        EmergencySoundSystem.init();
         initMap();
         setupSearchInput();
         setupClock();
-        // Initial scan for default preset (Jamnagar)
-        fetchProximityAlerts(currentLat, currentLon, currentRadiusKm, currentLocationLabel);
+
+        // Unlock audio on any first user interaction (click, key, touch)
+        const unlockAudio = function () {
+            EmergencySoundSystem.ensureAudioContext();
+            if (currentAlertData && EmergencySoundSystem.currentMode === "SILENT" && !EmergencySoundSystem.isMutedByUser) {
+                EmergencySoundSystem.evaluate(currentAlertData);
+            }
+        };
+
+        document.addEventListener("click", unlockAudio, { passive: true });
+        document.addEventListener("keydown", unlockAudio, { passive: true });
+        document.addEventListener("touchstart", unlockAudio, { passive: true });
+
+        // Initial scan for default preset (Dniprorudne)
+        fetchProximityAlerts(currentLat, currentLon, currentRadiusKm, currentLocationLabel, false);
     });
+
 
     // ── Leaflet Tactical Map Initialization ──────────────────────────────────
     function initMap() {
@@ -65,16 +407,20 @@
             document.getElementById("input-lon").value = lng.toFixed(4);
             clearActivePresetChips();
             reverseGeocode(lat, lng);
-            fetchProximityAlerts(lat, lng, currentRadiusKm, `Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})`);
+            fetchProximityAlerts(lat, lng, currentRadiusKm, `Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})`, true);
         });
     }
 
     // ── Proximity API Call ───────────────────────────────────────────────────
-    async function fetchProximityAlerts(lat, lon, radiusKm, locationName) {
+    async function fetchProximityAlerts(lat, lon, radiusKm, locationName, resetMute = true) {
         currentLat = lat;
         currentLon = lon;
         currentRadiusKm = radiusKm;
         if (locationName) currentLocationLabel = locationName;
+
+        if (resetMute) {
+            EmergencySoundSystem.isMutedByUser = false;
+        }
 
         updateLocationBadge(currentLat, currentLon, currentLocationLabel);
 
@@ -262,11 +608,11 @@
         renderResponderTab(data);
         renderMap(data);
 
-        // Auto siren arm
-        if (data.should_sound_alarm && !isSirenPlaying) {
-            const bannerSirenBtn = document.getElementById("banner-siren-btn");
-            if (bannerSirenBtn) bannerSirenBtn.style.animation = "alertPulse 1s infinite alternate";
-        }
+        // Evaluate emergency audio system:
+        // Critical Zone: Continuous Evacuation Hooter until stopped
+        // Moderate Zone: Continuous Advisory Alert Beep until stopped
+        // Safe Zone: Complete Silence (all sounds stopped)
+        EmergencySoundSystem.evaluate(data);
     }
 
     // ── Render Sidebar Stats ─────────────────────────────────────────────────
@@ -303,15 +649,30 @@
         const banner = document.getElementById("critical-alert-banner");
         const title = document.getElementById("banner-title");
         const desc = document.getElementById("banner-desc");
+        const icon = banner ? banner.querySelector(".banner-siren-icon") : null;
 
         if (!banner) return;
-        if (data.threat_level === "CRITICAL DANGER" || data.threat_level === "HIGH THREAT") {
+        const threat = data.threat_level;
+
+        if (threat === "CRITICAL DANGER" || threat === "HIGH THREAT") {
             banner.style.display = "block";
-            if (title) title.textContent = `${data.threat_level}: THERMAL HAZARD IN SECTOR`;
-            if (desc) desc.textContent = data.status_description;
+            banner.classList.remove("moderate");
+            if (icon) icon.textContent = "🚨";
+            if (title) title.textContent = `${threat}: EVACUATION HOOTER ACTIVE`;
+            if (desc) desc.textContent = data.status_description || "Thermal anomaly within immediate hazard perimeter. Evacuation hooter is sounding.";
+        } else if (threat === "MONITORING ADVISORY") {
+            banner.style.display = "block";
+            banner.classList.add("moderate");
+            if (icon) icon.textContent = "⚠️";
+            if (title) title.textContent = "MONITORING ADVISORY: ALERT BEEP ACTIVE";
+            if (desc) desc.textContent = data.status_description || "Thermal anomalies within 50km perimeter. Advisory alert beep is sounding.";
         } else {
+            // Safe Zone or Standby: Hide banner
             banner.style.display = "none";
+            banner.classList.remove("moderate");
         }
+
+        EmergencySoundSystem.updateUI();
     }
 
     // ── Render Weather & Air Quality Floating Bar ────────────────────────────
@@ -964,29 +1325,19 @@
         }
     };
 
-    // ── Audio Siren Controller ───────────────────────────────────────────────
+    // ── Emergency Sound Controller (Stop / Resume) ───────────────────────────
     window.toggleSirenSound = function () {
-        const audio = document.getElementById("emergency-siren-audio");
-        const btnText = document.getElementById("alarm-btn-text");
-        const btnIcon = document.getElementById("alarm-btn-icon");
-
-        if (!audio) return;
-
-        if (isSirenPlaying) {
-            audio.pause();
-            audio.currentTime = 0;
-            isSirenPlaying = false;
-            if (btnText) btnText.textContent = "Alarm: SILENCED";
-            if (btnIcon) btnIcon.textContent = "🔇";
+        EmergencySoundSystem.ensureAudioContext();
+        if (EmergencySoundSystem.currentMode !== "SILENT") {
+            // Actively sounding hooter or beep -> User clicked to STOP
+            EmergencySoundSystem.stopAll(true);
         } else {
-            audio.play().then(() => {
-                isSirenPlaying = true;
-                if (btnText) btnText.textContent = "Alarm: SOUNDING";
-                if (btnIcon) btnIcon.textContent = "🚨";
-            }).catch(err => {
-                console.warn("Audio autoplay blocked:", err);
-                alert("Please click or interact with the page to allow siren audio playback.");
-            });
+            // Sound is stopped or safe -> User clicked to resume / test
+            if (currentAlertData) {
+                EmergencySoundSystem.unmuteAndReevaluate(currentAlertData);
+            } else {
+                EmergencySoundSystem.playCriticalHooter();
+            }
         }
     };
 
