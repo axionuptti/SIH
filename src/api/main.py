@@ -422,7 +422,85 @@ def destination_point(lat: float, lon: float, distance_km: float, bearing_deg: f
         math.sin(bearing_rad) * math.sin(d_div_r) * math.cos(lat_rad),
         math.cos(d_div_r) - math.sin(lat_rad) * math.sin(dest_lat_rad)
     )
-    return round(math.degrees(dest_lat_rad), 5), round(math.degrees(dest_lon_rad), 5)
+# ─── International Emergency Numbers Database (Location & Country-Aware) ──────
+EMERGENCY_NUMBERS = {
+    "IN": {"country": "India", "fire": "101", "police": "100", "universal": "112", "fire_name": "Fire Brigade", "police_name": "Police Control Room"},
+    "US": {"country": "United States", "fire": "911", "police": "911", "universal": "911", "fire_name": "Fire Department", "police_name": "Police (911)"},
+    "CA": {"country": "Canada", "fire": "911", "police": "911", "universal": "911", "fire_name": "Fire Department", "police_name": "Police (911)"},
+    "GB": {"country": "United Kingdom", "fire": "999", "police": "999", "universal": "112", "fire_name": "Fire & Rescue (999)", "police_name": "Police (999)"},
+    "AU": {"country": "Australia", "fire": "000", "police": "000", "universal": "000", "fire_name": "Fire Brigade (000)", "police_name": "Police (000)"},
+    "NZ": {"country": "New Zealand", "fire": "111", "police": "111", "universal": "111", "fire_name": "Fire Service (111)", "police_name": "Police (111)"},
+    "FR": {"country": "France", "fire": "18", "police": "17", "universal": "112", "fire_name": "Sapeurs-Pompiers (18)", "police_name": "Police Nationale (17)"},
+    "DE": {"country": "Germany", "fire": "112", "police": "110", "universal": "112", "fire_name": "Feuerwehr (112)", "police_name": "Polizei (110)"},
+    "IT": {"country": "Italy", "fire": "115", "police": "112", "universal": "112", "fire_name": "Vigili del Fuoco (115)", "police_name": "Carabinieri / Polizia (112)"},
+    "ES": {"country": "Spain", "fire": "080", "police": "091", "universal": "112", "fire_name": "Bomberos (080)", "police_name": "Policía Nacional (091)"},
+    "PT": {"country": "Portugal", "fire": "112", "police": "112", "universal": "112", "fire_name": "Bombeiros (112)", "police_name": "Polícia (112)"},
+    "BR": {"country": "Brazil", "fire": "193", "police": "190", "universal": "193", "fire_name": "Corpo de Bombeiros (193)", "police_name": "Polícia Militar (190)"},
+    "UA": {"country": "Ukraine", "fire": "101", "police": "102", "universal": "112", "fire_name": "State Emergency Service (101)", "police_name": "National Police (102)"},
+    "RU": {"country": "Russia", "fire": "101", "police": "102", "universal": "112", "fire_name": "Fire Rescue (101)", "police_name": "Police (102)"},
+    "CN": {"country": "China", "fire": "119", "police": "110", "universal": "110", "fire_name": "Fire Service (119)", "police_name": "Public Security Police (110)"},
+    "JP": {"country": "Japan", "fire": "119", "police": "110", "universal": "119", "fire_name": "Fire & Rescue (119)", "police_name": "Police (110)"},
+    "KR": {"country": "South Korea", "fire": "119", "police": "112", "universal": "119", "fire_name": "National Fire Agency (119)", "police_name": "Korean National Police (112)"},
+    "SG": {"country": "Singapore", "fire": "995", "police": "999", "universal": "995", "fire_name": "SCDF Emergency Fire (995)", "police_name": "Police Operations (999)"},
+    "MY": {"country": "Malaysia", "fire": "994", "police": "999", "universal": "999", "fire_name": "Bomba Fire & Rescue (994)", "police_name": "Royal Malaysia Police (999)"},
+    "ID": {"country": "Indonesia", "fire": "113", "police": "110", "universal": "112", "fire_name": "Damkar Fire (113)", "police_name": "POLRI Police (110)"},
+    "TH": {"country": "Thailand", "fire": "199", "police": "191", "universal": "191", "fire_name": "Fire & Rescue (199)", "police_name": "Royal Thai Police (191)"},
+    "PH": {"country": "Philippines", "fire": "911", "police": "911", "universal": "911", "fire_name": "Bureau of Fire Protection (911)", "police_name": "Philippine National Police (911)"},
+    "VN": {"country": "Vietnam", "fire": "114", "police": "113", "universal": "114", "fire_name": "Fire Police (114)", "police_name": "Police (113)"},
+    "MX": {"country": "Mexico", "fire": "911", "police": "911", "universal": "911", "fire_name": "Bomberos (911)", "police_name": "Policía (911)"},
+    "AR": {"country": "Argentina", "fire": "100", "police": "911", "universal": "911", "fire_name": "Bomberos (100)", "police_name": "Policía (911)"},
+    "CL": {"country": "Chile", "fire": "132", "police": "133", "universal": "133", "fire_name": "Bomberos (132)", "police_name": "Carabineros (133)"},
+    "CO": {"country": "Colombia", "fire": "119", "police": "123", "universal": "123", "fire_name": "Cuerpo de Bomberos (119)", "police_name": "Policía Nacional (123)"},
+    "ZA": {"country": "South Africa", "fire": "10177", "police": "10111", "universal": "112", "fire_name": "Fire & Rescue (10177)", "police_name": "SAPS Police (10111)"},
+    "EG": {"country": "Egypt", "fire": "180", "police": "122", "universal": "122", "fire_name": "Civil Protection Fire (180)", "police_name": "Police (122)"},
+    "SA": {"country": "Saudi Arabia", "fire": "998", "police": "999", "universal": "911", "fire_name": "Civil Defense (998)", "police_name": "Police (999)"},
+    "AE": {"country": "United Arab Emirates", "fire": "997", "police": "999", "universal": "999", "fire_name": "Civil Defence (997)", "police_name": "Police (999)"},
+    "TR": {"country": "Turkey", "fire": "110", "police": "155", "universal": "112", "fire_name": "İtfaiye (110)", "police_name": "Polis (155)"},
+    "GR": {"country": "Greece", "fire": "199", "police": "100", "universal": "112", "fire_name": "Hellenic Fire Service (199)", "police_name": "Hellenic Police (100)"},
+    "PK": {"country": "Pakistan", "fire": "16", "police": "15", "universal": "15", "fire_name": "Fire Brigade (16)", "police_name": "Police Emergency (15)"},
+    "BD": {"country": "Bangladesh", "fire": "199", "police": "999", "universal": "999", "fire_name": "Fire Service (199)", "police_name": "Bangladesh Police (999)"},
+    "NP": {"country": "Nepal", "fire": "101", "police": "100", "universal": "100", "fire_name": "Fire Brigade (101)", "police_name": "Nepal Police (100)"},
+    "LK": {"country": "Sri Lanka", "fire": "110", "police": "119", "universal": "119", "fire_name": "Fire Brigade (110)", "police_name": "Police Emergency (119)"},
+    "NG": {"country": "Nigeria", "fire": "112", "police": "112", "universal": "112", "fire_name": "Federal Fire Service (112)", "police_name": "Nigeria Police Force (112)"},
+    "KE": {"country": "Kenya", "fire": "999", "police": "999", "universal": "112", "fire_name": "Fire Rescue (999)", "police_name": "National Police Service (999)"},
+    "IQ": {"country": "Iraq", "fire": "115", "police": "104", "universal": "112", "fire_name": "Civil Defense Fire (115)", "police_name": "Police Control (104)"},
+    "AO": {"country": "Angola", "fire": "115", "police": "113", "universal": "112", "fire_name": "Bombeiros (115)", "police_name": "Polícia Nacional (113)"},
+    "CD": {"country": "DR Congo", "fire": "118", "police": "112", "universal": "112", "fire_name": "Sapeurs-Pompiers (118)", "police_name": "Police (112)"},
+    "ZM": {"country": "Zambia", "fire": "993", "police": "991", "universal": "999", "fire_name": "Fire Brigade (993)", "police_name": "Police (991)"},
+    "KZ": {"country": "Kazakhstan", "fire": "101", "police": "102", "universal": "112", "fire_name": "Fire Service (101)", "police_name": "Police (102)"}
+}
+
+DEFAULT_EMERGENCY = {
+    "country": "International",
+    "fire": "112",
+    "police": "911",
+    "universal": "112",
+    "fire_name": "Fire Emergency (112)",
+    "police_name": "Police Dispatch (911)"
+}
+
+def get_emergency_contacts(lat: float, lon: float):
+    """Dynamically resolves local country, police, and fire brigade emergency hotlines using coordinates."""
+    try:
+        import reverse_geocode
+        geo = reverse_geocode.get((lat, lon))
+        cc = (geo.get("country_code") or "").upper()
+        country = geo.get("country") or "International"
+        city = geo.get("city") or ""
+        state = geo.get("state") or ""
+    except Exception:
+        cc = "IN"
+        country = "India"
+        city = ""
+        state = ""
+
+    info = EMERGENCY_NUMBERS.get(cc, DEFAULT_EMERGENCY).copy()
+    if country and country != "International":
+        info["country"] = country
+    info["country_code"] = cc
+    info["city"] = city
+    info["state"] = state
+    return info
 
 @app.get("/api/alerts/proximity", tags=["Alerts"])
 def get_proximity_alerts(
@@ -546,6 +624,9 @@ def get_proximity_alerts(
         escape_route_note = "Area is currently free of active satellite fire anomalies."
         buffer_km = 0.0
 
+    # Resolve dynamic local country emergency dispatch numbers
+    emergency_contacts = get_emergency_contacts(lat, lon)
+
     # ── Tailored Evacuation Steps ──
     evacuation_steps = []
     if threat_level in ["CRITICAL DANGER", "HIGH THREAT"]:
@@ -571,8 +652,8 @@ def get_proximity_alerts(
             {
                 "phase": "Phase 4: Emergency Hotlines & Notification",
                 "urgent": True,
-                "action": "Signal Dispatch & Loved Ones",
-                "details": "Alert local emergency services: Fire Emergency (101 in India / 911 Intl), Police (100 / 911), Disaster Management Cell. Transmit your current GPS coordinates."
+                "action": f"Signal {emergency_contacts['fire_name']} & Loved Ones",
+                "details": f"Alert local emergency dispatch: {emergency_contacts['fire_name']} ({emergency_contacts['fire']} in {emergency_contacts['country']}) or {emergency_contacts['police_name']} ({emergency_contacts['police']}). Transmit your current GPS coordinates ({round(lat, 4)}, {round(lon, 4)})."
             }
         ]
     elif threat_level == "MONITORING ADVISORY":
@@ -762,6 +843,7 @@ def get_proximity_alerts(
         "designated_shelters": designated_shelters,
         "weather": weather_intel,
         "air_quality": air_quality_intel,
+        "emergency_contacts": emergency_contacts,
         "evacuation_steps": evacuation_steps,
         "fire_control_strategy": fire_control,
         "responder_metrics": responder_tactics_advanced,

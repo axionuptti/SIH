@@ -27,6 +27,72 @@
     let searchDebounceTimer = null;
     const STORAGE_KEY_CHECKED = "sih_evac_checked_steps_v1";
 
+    // ── International Emergency Numbers Directory (45+ Countries Client Cache) ──
+    const CLIENT_EMERGENCY_NUMBERS = {
+        "IN": { country: "India", fire: "101", police: "100", universal: "112", flag: "🇮🇳" },
+        "US": { country: "United States", fire: "911", police: "911", universal: "911", flag: "🇺🇸" },
+        "CA": { country: "Canada", fire: "911", police: "911", universal: "911", flag: "🇨🇦" },
+        "GB": { country: "United Kingdom", fire: "999", police: "999", universal: "112", flag: "🇬🇧" },
+        "AU": { country: "Australia", fire: "000", police: "000", universal: "000", flag: "🇦🇺" },
+        "NZ": { country: "New Zealand", fire: "111", police: "111", universal: "111", flag: "🇳🇿" },
+        "FR": { country: "France", fire: "18", police: "17", universal: "112", flag: "🇫🇷" },
+        "DE": { country: "Germany", fire: "112", police: "110", universal: "112", flag: "🇩🇪" },
+        "IT": { country: "Italy", fire: "115", police: "112", universal: "112", flag: "🇮🇹" },
+        "ES": { country: "Spain", fire: "080", police: "091", universal: "112", flag: "🇪🇸" },
+        "PT": { country: "Portugal", fire: "112", police: "112", universal: "112", flag: "🇵🇹" },
+        "BR": { country: "Brazil", fire: "193", police: "190", universal: "193", flag: "🇧🇷" },
+        "UA": { country: "Ukraine", fire: "101", police: "102", universal: "112", flag: "🇺🇦" },
+        "RU": { country: "Russia", fire: "101", police: "102", universal: "112", flag: "🇷🇺" },
+        "CN": { country: "China", fire: "119", police: "110", universal: "110", flag: "🇨🇳" },
+        "JP": { country: "Japan", fire: "119", police: "110", universal: "119", flag: "🇯🇵" },
+        "KR": { country: "South Korea", fire: "119", police: "112", universal: "119", flag: "🇰🇷" },
+        "SG": { country: "Singapore", fire: "995", police: "999", universal: "995", flag: "🇸🇬" },
+        "MY": { country: "Malaysia", fire: "994", police: "999", universal: "999", flag: "🇲🇾" },
+        "ID": { country: "Indonesia", fire: "113", police: "110", universal: "112", flag: "🇮🇩" },
+        "TH": { country: "Thailand", fire: "199", police: "191", universal: "191", flag: "🇹🇭" },
+        "PH": { country: "Philippines", fire: "911", police: "911", universal: "911", flag: "🇵🇭" },
+        "VN": { country: "Vietnam", fire: "114", police: "113", universal: "114", flag: "🇻🇳" },
+        "MX": { country: "Mexico", fire: "911", police: "911", universal: "911", flag: "🇲🇽" },
+        "AR": { country: "Argentina", fire: "100", police: "911", universal: "911", flag: "🇦🇷" },
+        "CL": { country: "Chile", fire: "132", police: "133", universal: "133", flag: "🇨🇱" },
+        "CO": { country: "Colombia", fire: "119", police: "123", universal: "123", flag: "🇨🇴" },
+        "ZA": { country: "South Africa", fire: "10177", police: "10111", universal: "112", flag: "🇿🇦" },
+        "EG": { country: "Egypt", fire: "180", police: "122", universal: "122", flag: "🇪🇬" },
+        "SA": { country: "Saudi Arabia", fire: "998", police: "999", universal: "911", flag: "🇸🇦" },
+        "AE": { country: "United Arab Emirates", fire: "997", police: "999", universal: "999", flag: "🇦🇪" },
+        "TR": { country: "Turkey", fire: "110", police: "155", universal: "112", flag: "🇹🇷" },
+        "GR": { country: "Greece", fire: "199", police: "100", universal: "112", flag: "🇬🇷" },
+        "PK": { country: "Pakistan", fire: "16", police: "15", universal: "15", flag: "🇵🇰" },
+        "BD": { country: "Bangladesh", fire: "199", police: "999", universal: "999", flag: "🇧🇩" },
+        "NP": { country: "Nepal", fire: "101", police: "100", universal: "100", flag: "🇳🇵" },
+        "LK": { country: "Sri Lanka", fire: "110", police: "119", universal: "119", flag: "🇱🇰" },
+        "NG": { country: "Nigeria", fire: "112", police: "112", universal: "112", flag: "🇳🇬" },
+        "KE": { country: "Kenya", fire: "999", police: "999", universal: "112", flag: "🇰🇪" },
+        "IQ": { country: "Iraq", fire: "115", police: "104", universal: "112", flag: "🇮🇶" },
+        "AO": { country: "Angola", fire: "115", police: "113", universal: "112", flag: "🇦🇴" },
+        "CD": { country: "DR Congo", fire: "118", police: "112", universal: "112", flag: "🇨🇩" },
+        "ZM": { country: "Zambia", fire: "993", police: "991", universal: "999", flag: "🇿🇲" },
+        "KZ": { country: "Kazakhstan", fire: "101", police: "102", universal: "112", flag: "🇰🇿" }
+    };
+
+    const CLIENT_DEFAULT_EMERGENCY = {
+        country: "International",
+        fire: "112",
+        police: "911",
+        universal: "112",
+        flag: "🌐"
+    };
+
+    function getCountryFlag(cc) {
+        if (!cc || cc.length !== 2) return "📍";
+        try {
+            const codePoints = cc.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
+            return String.fromCodePoint(...codePoints);
+        } catch (e) {
+            return "📍";
+        }
+    }
+
     // ── Tactical Emergency Sound Engine (Industrial Horn Hooter & Single Beep) ─
     const EmergencySoundSystem = {
         audioContext: null,
@@ -514,6 +580,10 @@
             const escapeHeading = closest && closest.is_downwind ? (rawEscape + 90) % 360 : rawEscape;
             const bufferKm = closest ? Math.max(Math.round(closest.frp * 0.08 * 10) / 10, 2.5) : 0;
 
+            const fallbackEmergency = (currentAlertData && currentAlertData.emergency_contacts) 
+                ? currentAlertData.emergency_contacts 
+                : (CLIENT_EMERGENCY_NUMBERS["IN"] || CLIENT_DEFAULT_EMERGENCY);
+
             const fallbackData = {
                 user_coordinates: { latitude: userLat, longitude: userLon },
                 search_radius_km: radiusKm,
@@ -565,6 +635,7 @@
                     category: closest && closest.is_downwind ? "Very Unhealthy" : "Moderate",
                     health_advisory: "Wear P100/N95 respirator to prevent particulate ash inhalation."
                 },
+                emergency_contacts: fallbackEmergency,
                 evacuation_steps: [
                     {
                         phase: "Phase 1: Immediate Egress",
@@ -583,8 +654,8 @@
                     },
                     {
                         phase: "Phase 4: Emergency Contacts",
-                        action: "Alert Local Dispatch",
-                        details: "Dial Fire Brigade 101 / 911 or Police 100 with your GPS location."
+                        action: `Alert ${fallbackEmergency.fire_name || 'Emergency Dispatch'}`,
+                        details: `Dial Fire ${fallbackEmergency.fire} or Police ${fallbackEmergency.police} with your coordinates (${userLat.toFixed(4)}, ${userLon.toFixed(4)}).`
                     }
                 ],
                 fire_control_strategy: {
@@ -614,6 +685,7 @@
     function renderAll(data) {
         renderSidebarStats(data);
         renderTopBanner(data);
+        renderEmergencyContacts(data.emergency_contacts);
         renderWeatherAndAir(data);
         renderEscapeVector(data);
         renderChecklist(data.evacuation_steps || []);
@@ -622,10 +694,49 @@
         renderMap(data);
 
         // Evaluate emergency audio system:
-        // Critical Zone: Continuous Evacuation Hooter until stopped
+        // Critical Zone: Continuous Evacuation Fire Alarm until stopped
         // Moderate Zone: Continuous Advisory Alert Beep until stopped
         // Safe Zone: Complete Silence (all sounds stopped)
         EmergencySoundSystem.evaluate(data);
+    }
+
+    // ── Dynamic Country-Aware Emergency Contacts Renderer ───────────────────
+    function renderEmergencyContacts(contacts) {
+        if (!contacts) return;
+        const fireBtn = document.getElementById("sos-btn-fire");
+        const fireLabel = document.getElementById("sos-label-fire");
+        const policeBtn = document.getElementById("sos-btn-police");
+        const policeLabel = document.getElementById("sos-label-police");
+        const badgeText = document.getElementById("sos-country-text");
+        const badgeFlag = document.getElementById("sos-country-flag");
+
+        const fireNum = contacts.fire || "101";
+        const policeNum = contacts.police || "100";
+        const country = contacts.country || "Local Dispatch";
+        const flag = contacts.flag || (contacts.country_code ? getCountryFlag(contacts.country_code) : "📍");
+
+        if (fireBtn) {
+            fireBtn.href = `tel:${fireNum}`;
+            fireBtn.title = `Call ${country} Fire Dispatch: ${fireNum}`;
+        }
+        if (fireLabel) {
+            fireLabel.textContent = `Fire: ${fireNum}`;
+        }
+
+        if (policeBtn) {
+            policeBtn.href = `tel:${policeNum}`;
+            policeBtn.title = `Call ${country} Police Dispatch: ${policeNum}`;
+        }
+        if (policeLabel) {
+            policeLabel.textContent = `Police: ${policeNum}`;
+        }
+
+        if (badgeText) {
+            badgeText.textContent = `Local Dispatch: ${country} (Fire: ${fireNum} · Police: ${policeNum})`;
+        }
+        if (badgeFlag) {
+            badgeFlag.textContent = flag;
+        }
     }
 
     // ── Render Sidebar Stats ─────────────────────────────────────────────────
@@ -1209,6 +1320,18 @@
                     currentLocationLabel = data.display_name;
                     updateLocationBadge(lat, lon, data.display_name);
                 }
+                // Immediately localize hotlines based on country code from reverse geocode
+                if (data && data.address && data.address.country_code) {
+                    const cc = data.address.country_code.toUpperCase();
+                    const localInfo = CLIENT_EMERGENCY_NUMBERS[cc] || {
+                        country: data.address.country || "Local Dispatch",
+                        fire: "112",
+                        police: "911",
+                        universal: "112",
+                        flag: getCountryFlag(cc)
+                    };
+                    renderEmergencyContacts(localInfo);
+                }
             }
         } catch (e) {
             // silent ignore
@@ -1349,7 +1472,7 @@
             if (currentAlertData) {
                 EmergencySoundSystem.unmuteAndReevaluate(currentAlertData);
             } else {
-                EmergencySoundSystem.playCriticalHooter();
+                EmergencySoundSystem.playCriticalFireAlarm();
             }
         }
     };
@@ -1364,12 +1487,14 @@
         if (!currentAlertData) return;
         const d = currentAlertData;
         const closest = d.closest_fire;
+        const em = d.emergency_contacts || { country: "Local Dispatch", fire: "101", police: "100" };
         const msg = encodeURIComponent(
             `🚨 *EMERGENCY SOS: SATELLITE FIRE ALERT* 🚨\n\n` +
             `📍 *My Location:* ${currentLocationLabel}\n` +
             `🗺️ *Coordinates:* https://maps.google.com/?q=${currentLat},${currentLon}\n` +
             `🔥 *Hazard:* ${closest ? closest.classification : "Active Fire"} (${closest ? closest.distance_km : 0} km away)\n` +
             `🧭 *Safe Escape Heading:* ${d.escape_heading ? `${d.escape_heading.degrees}° ${d.escape_heading.cardinal}` : "Away from sector"}\n` +
+            `📞 *Local Emergency (${em.country}):* Fire: ${em.fire} | Police: ${em.police}\n` +
             `🛡️ *Status:* ${d.threat_level}\n\n` +
             `_Automated emergency broadcast generated via SIH26162 Satellite AI._`
         );
@@ -1380,8 +1505,9 @@
         if (!currentAlertData) return;
         const d = currentAlertData;
         const closest = d.closest_fire;
+        const em = d.emergency_contacts || { country: "Local Dispatch", fire: "101", police: "100" };
         const body = encodeURIComponent(
-            `EMERGENCY SOS: Fire threat ${closest ? closest.distance_km : 0}km from my coordinates (${currentLat},${currentLon}). Evacuating along heading ${d.escape_heading ? d.escape_heading.degrees : 0}deg. Need assistance.`
+            `EMERGENCY SOS: Fire threat ${closest ? closest.distance_km : 0}km from (${currentLat},${currentLon}). Evacuating along heading ${d.escape_heading ? d.escape_heading.degrees : 0}deg. Local Dispatch (${em.country}): Fire ${em.fire}, Police ${em.police}. Need assistance.`
         );
         window.open(`sms:?body=${body}`, "_self");
     };

@@ -196,12 +196,17 @@
                     <button class="sos-action-btn sms" onclick="window.sendSmsSOS()" title="Send SMS with coordinates to family / contacts">
                         <span>✉️</span> SMS Alert
                     </button>
-                    <a href="tel:101" class="sos-action-btn phone" title="Call Fire Brigade">
-                        <span>🚒</span> Fire: 101
+                    <a id="sos-btn-fire" href="tel:101" class="sos-action-btn phone" title="Call Local Fire Brigade">
+                        <span>🚒</span> <span id="sos-label-fire">Fire: 101</span>
                     </a>
-                    <a href="tel:100" class="sos-action-btn phone" title="Call Police Dispatch">
-                        <span>🚓</span> Police: 100
+                    <a id="sos-btn-police" href="tel:100" class="sos-action-btn phone" title="Call Local Police Dispatch">
+                        <span>🚓</span> <span id="sos-label-police">Police: 100</span>
                     </a>
+                </div>
+                <!-- Dynamic Location-Aware Emergency Hotlines Badge -->
+                <div id="sos-country-badge" class="sos-country-badge" title="Emergency numbers automatically localized based on your detected country and GPS coordinates">
+                    <span id="sos-country-flag">📍</span>
+                    <span id="sos-country-text">Local Dispatch: India (Fire: 101 · Police: 100)</span>
                 </div>
             </section>
 
