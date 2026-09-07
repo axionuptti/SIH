@@ -354,7 +354,8 @@
         }).setView([currentLat, currentLon], 10);
 
         // Dark Matter Basemap (Matches Main Dashboard)
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        const BASEMAPS_API_KEY = "cb1_2zsc_1_6906339c23d46ebbaf5c5c8c";
+        L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${BASEMAPS_API_KEY}`, {
             maxZoom: 18,
             subdomains: "abcd"
         }).addTo(map);
