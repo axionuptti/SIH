@@ -634,6 +634,54 @@ body {
     transform: translateY(-1px);
 }
 
+.sos-action-btn.helpline {
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+    color: #fde68a;
+}
+
+.sos-action-btn.helpline:hover {
+    background: rgba(245, 158, 11, 0.22);
+    border-color: rgba(245, 158, 11, 0.7);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.sos-action-btn.phone {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+}
+
+.sos-action-btn.phone:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+}
+
+.sos-action-btn.police {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.12);
+    color: #bfdbfe;
+}
+
+.sos-action-btn.police:hover {
+    background: rgba(59, 130, 246, 0.22);
+    border-color: rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+.sos-action-btn.ambulance {
+    border-color: rgba(20, 184, 166, 0.45);
+    background: rgba(20, 184, 166, 0.12);
+    color: #99f6e4;
+}
+
+.sos-action-btn.ambulance:hover {
+    background: rgba(20, 184, 166, 0.22);
+    border-color: rgba(20, 184, 166, 0.7);
+    box-shadow: 0 0 12px rgba(20, 184, 166, 0.25);
+}
+
 .sos-action-btn.whatsapp {
     border-color: rgba(16, 185, 129, 0.4);
     background: rgba(16, 185, 129, 0.1);
@@ -644,12 +692,6 @@ body {
     border-color: rgba(56, 189, 248, 0.4);
     background: rgba(56, 189, 248, 0.1);
     color: #bae6fd;
-}
-
-.sos-action-btn.phone {
-    border-color: rgba(239, 68, 68, 0.4);
-    background: rgba(239, 68, 68, 0.1);
-    color: #fca5a5;
 }
 
 .sos-country-badge {

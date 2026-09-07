@@ -106,11 +106,16 @@
                 <div class="preset-pills-row">
                     <span class="preset-label">TEST ZONES:</span>
                     <div class="preset-pills-scroll">
-                        <button class="preset-pill active" onclick="window.loadPreset(47.3517, 34.9868, 'Dniprorudne Timber & Industrial Sector')">🚨 Critical (Hooter)</button>
-                        <button class="preset-pill" onclick="window.loadPreset(47.9000, 34.9800, 'Zaporizhzhia Regional Advisory Sector')">⚠️ Moderate (Beep)</button>
-                        <button class="preset-pill" onclick="window.loadPreset(28.6139, 77.2090, 'New Delhi Capital Safe Sector')">🛡️ Safe (Silent)</button>
-                        <button class="preset-pill" onclick="window.loadPreset(30.5000, 47.8000, 'Basra Advisory Perimeter')">⚠️ Basra (Beep)</button>
-                        <button class="preset-pill" onclick="window.loadPreset(22.4707, 70.0654, 'Jamnagar Sector')">🛡️ Jamnagar (Silent)</button>
+                        <button class="preset-pill active" onclick="window.loadPreset(47.3517, 34.9868, 'Dniprorudne Timber & Industrial Sector')">🚨 Critical (Ukraine 112)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(47.9000, 34.9800, 'Zaporizhzhia Regional Advisory Sector')">⚠️ Moderate (Ukraine 112)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(28.6139, 77.2090, 'New Delhi Capital Safe Sector')">🛡️ Safe (India 112)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(30.5000, 47.8000, 'Basra Advisory Perimeter')">⚠️ Basra (Iraq 112)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(34.0522, -118.2437, 'California Wildfire Perimeter')">🇺🇸 USA (911)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(51.5074, -0.1278, 'Greater London Sector')">🇬🇧 UK (999)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(-33.8688, 151.2093, 'Sydney Bushfire Zone')">🇦🇺 Australia (000)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(-23.5505, -46.6333, 'Sao Paulo Industrial Rim')">🇧🇷 Brazil (190)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(35.6762, 139.6503, 'Tokyo Metro Safety Zone')">🇯🇵 Japan (110)</button>
+                        <button class="preset-pill" onclick="window.loadPreset(22.4707, 70.0654, 'Jamnagar Sector')">🛡️ Jamnagar (India)</button>
                     </div>
                 </div>
 
@@ -188,25 +193,31 @@
 
             <!-- SOS Communication Hub -->
             <section class="sos-hub-section">
-                <span class="section-micro-title">EMERGENCY SOS BROADCAST</span>
+                <span class="section-micro-title">EMERGENCY SOS & HELPLINES</span>
                 <div class="sos-buttons-grid">
+                    <a id="sos-btn-helpline" href="tel:112" class="sos-action-btn helpline" title="Call National Emergency Helpline">
+                        <span>🆘</span> <span id="sos-label-helpline">Helpline: 112</span>
+                    </a>
+                    <a id="sos-btn-fire" href="tel:101" class="sos-action-btn phone" title="Call Local Fire Brigade">
+                        <span>🚒</span> <span id="sos-label-fire">Fire: 101</span>
+                    </a>
+                    <a id="sos-btn-police" href="tel:102" class="sos-action-btn police" title="Call Local Police Dispatch">
+                        <span>🚓</span> <span id="sos-label-police">Police: 102</span>
+                    </a>
+                    <a id="sos-btn-ambulance" href="tel:103" class="sos-action-btn ambulance" title="Call Medical Emergency Ambulance">
+                        <span>🚑</span> <span id="sos-label-ambulance">Ambulance: 103</span>
+                    </a>
                     <button class="sos-action-btn whatsapp" onclick="window.sendWhatsAppSOS()" title="Broadcast current GPS and fire proximity via WhatsApp">
                         <span>📲</span> WhatsApp SOS
                     </button>
                     <button class="sos-action-btn sms" onclick="window.sendSmsSOS()" title="Send SMS with coordinates to family / contacts">
                         <span>✉️</span> SMS Alert
                     </button>
-                    <a id="sos-btn-fire" href="tel:101" class="sos-action-btn phone" title="Call Local Fire Brigade">
-                        <span>🚒</span> <span id="sos-label-fire">Fire: 101</span>
-                    </a>
-                    <a id="sos-btn-police" href="tel:100" class="sos-action-btn phone" title="Call Local Police Dispatch">
-                        <span>🚓</span> <span id="sos-label-police">Police: 100</span>
-                    </a>
                 </div>
                 <!-- Dynamic Location-Aware Emergency Hotlines Badge -->
                 <div id="sos-country-badge" class="sos-country-badge" title="Emergency numbers automatically localized based on your detected country and GPS coordinates">
-                    <span id="sos-country-flag">📍</span>
-                    <span id="sos-country-text">Local Dispatch: India (Fire: 101 · Police: 100)</span>
+                    <span id="sos-country-flag">🇺🇦</span>
+                    <span id="sos-country-text">Local Helpline: Ukraine (Helpline: 112 · Fire: 101 · Police: 102 · Amb: 103)</span>
                 </div>
             </section>
 
@@ -422,7 +433,11 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Global Emergency Directory & Helplines (150+ Countries) -->
+    <script src="/dashboard/emergency_numbers.js"></script>
+    <script src="/emergency_numbers.js"></script>
     <!-- Emergency Alert Portal Logic -->
-    <script src="/dashboard/alerts.js?v=10"></script>
+    <script src="/dashboard/alerts.js?v=11"></script>
+    <script src="/alerts.js?v=11"></script>
 </body>
 </html>

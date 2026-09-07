@@ -77,9 +77,10 @@
 
     const CLIENT_DEFAULT_EMERGENCY = {
         country: "International",
+        helpline: "112",
         fire: "112",
         police: "911",
-        universal: "112",
+        ambulance: "112",
         flag: "🌐"
     };
 
@@ -580,9 +581,10 @@
             const escapeHeading = closest && closest.is_downwind ? (rawEscape + 90) % 360 : rawEscape;
             const bufferKm = closest ? Math.max(Math.round(closest.frp * 0.08 * 10) / 10, 2.5) : 0;
 
+            const dir = (window.GLOBAL_EMERGENCY_NUMBERS && Object.keys(window.GLOBAL_EMERGENCY_NUMBERS).length > 0) ? window.GLOBAL_EMERGENCY_NUMBERS : CLIENT_EMERGENCY_NUMBERS;
             const fallbackEmergency = (currentAlertData && currentAlertData.emergency_contacts) 
                 ? currentAlertData.emergency_contacts 
-                : (CLIENT_EMERGENCY_NUMBERS["IN"] || CLIENT_DEFAULT_EMERGENCY);
+                : (dir["IN"] || CLIENT_DEFAULT_EMERGENCY);
 
             const fallbackData = {
                 user_coordinates: { latitude: userLat, longitude: userLon },
@@ -653,9 +655,9 @@
                         details: `Drive headlights ON toward safe assembly center at least ${bufferKm} km away.`
                     },
                     {
-                        phase: "Phase 4: Emergency Contacts",
-                        action: `Alert ${fallbackEmergency.fire_name || 'Emergency Dispatch'}`,
-                        details: `Dial Fire ${fallbackEmergency.fire} or Police ${fallbackEmergency.police} with your coordinates (${userLat.toFixed(4)}, ${userLon.toFixed(4)}).`
+                        phase: "Phase 4: Emergency Helpline",
+                        action: `Alert ${fallbackEmergency.fire_name || 'Emergency Dispatch'} & Helpline (${fallbackEmergency.helpline || '112'})`,
+                        details: `Dial Helpline ${fallbackEmergency.helpline || '112'}, Fire ${fallbackEmergency.fire || '101'}, or Police ${fallbackEmergency.police || '100'} with your coordinates (${userLat.toFixed(4)}, ${userLon.toFixed(4)}).`
                     }
                 ],
                 fire_control_strategy: {
@@ -703,17 +705,31 @@
     // ── Dynamic Country-Aware Emergency Contacts Renderer ───────────────────
     function renderEmergencyContacts(contacts) {
         if (!contacts) return;
+        const helplineBtn = document.getElementById("sos-btn-helpline");
+        const helplineLabel = document.getElementById("sos-label-helpline");
         const fireBtn = document.getElementById("sos-btn-fire");
         const fireLabel = document.getElementById("sos-label-fire");
         const policeBtn = document.getElementById("sos-btn-police");
         const policeLabel = document.getElementById("sos-label-police");
+        const ambBtn = document.getElementById("sos-btn-ambulance");
+        const ambLabel = document.getElementById("sos-label-ambulance");
         const badgeText = document.getElementById("sos-country-text");
         const badgeFlag = document.getElementById("sos-country-flag");
 
+        const helplineNum = contacts.helpline || contacts.universal || "112";
         const fireNum = contacts.fire || "101";
         const policeNum = contacts.police || "100";
+        const ambNum = contacts.ambulance || "112";
         const country = contacts.country || "Local Dispatch";
         const flag = contacts.flag || (contacts.country_code ? getCountryFlag(contacts.country_code) : "📍");
+
+        if (helplineBtn) {
+            helplineBtn.href = `tel:${helplineNum}`;
+            helplineBtn.title = `Call ${country} National Emergency Helpline: ${helplineNum}`;
+        }
+        if (helplineLabel) {
+            helplineLabel.textContent = `Helpline: ${helplineNum}`;
+        }
 
         if (fireBtn) {
             fireBtn.href = `tel:${fireNum}`;
@@ -731,8 +747,16 @@
             policeLabel.textContent = `Police: ${policeNum}`;
         }
 
+        if (ambBtn) {
+            ambBtn.href = `tel:${ambNum}`;
+            ambBtn.title = `Call ${country} Medical Ambulance Helpline: ${ambNum}`;
+        }
+        if (ambLabel) {
+            ambLabel.textContent = `Amb: ${ambNum}`;
+        }
+
         if (badgeText) {
-            badgeText.textContent = `Local Dispatch: ${country} (Fire: ${fireNum} · Police: ${policeNum})`;
+            badgeText.textContent = `Local Helpline: ${country} (Helpline: ${helplineNum} · Fire: ${fireNum} · Police: ${policeNum} · Amb: ${ambNum})`;
         }
         if (badgeFlag) {
             badgeFlag.textContent = flag;
@@ -1323,11 +1347,13 @@
                 // Immediately localize hotlines based on country code from reverse geocode
                 if (data && data.address && data.address.country_code) {
                     const cc = data.address.country_code.toUpperCase();
-                    const localInfo = CLIENT_EMERGENCY_NUMBERS[cc] || {
+                    const dir = (window.GLOBAL_EMERGENCY_NUMBERS && Object.keys(window.GLOBAL_EMERGENCY_NUMBERS).length > 0) ? window.GLOBAL_EMERGENCY_NUMBERS : CLIENT_EMERGENCY_NUMBERS;
+                    const localInfo = dir[cc] || {
                         country: data.address.country || "Local Dispatch",
+                        helpline: "112",
                         fire: "112",
                         police: "911",
-                        universal: "112",
+                        ambulance: "112",
                         flag: getCountryFlag(cc)
                     };
                     renderEmergencyContacts(localInfo);
@@ -1487,14 +1513,14 @@
         if (!currentAlertData) return;
         const d = currentAlertData;
         const closest = d.closest_fire;
-        const em = d.emergency_contacts || { country: "Local Dispatch", fire: "101", police: "100" };
+        const em = d.emergency_contacts || { country: "Local Dispatch", helpline: "112", fire: "101", police: "100", ambulance: "108" };
         const msg = encodeURIComponent(
             `🚨 *EMERGENCY SOS: SATELLITE FIRE ALERT* 🚨\n\n` +
             `📍 *My Location:* ${currentLocationLabel}\n` +
             `🗺️ *Coordinates:* https://maps.google.com/?q=${currentLat},${currentLon}\n` +
             `🔥 *Hazard:* ${closest ? closest.classification : "Active Fire"} (${closest ? closest.distance_km : 0} km away)\n` +
             `🧭 *Safe Escape Heading:* ${d.escape_heading ? `${d.escape_heading.degrees}° ${d.escape_heading.cardinal}` : "Away from sector"}\n` +
-            `📞 *Local Emergency (${em.country}):* Fire: ${em.fire} | Police: ${em.police}\n` +
+            `📞 *Local Helplines (${em.country}):* Helpline: ${em.helpline || '112'} | Fire: ${em.fire || '101'} | Police: ${em.police || '100'} | Amb: ${em.ambulance || '108'}\n` +
             `🛡️ *Status:* ${d.threat_level}\n\n` +
             `_Automated emergency broadcast generated via SIH26162 Satellite AI._`
         );
@@ -1505,9 +1531,9 @@
         if (!currentAlertData) return;
         const d = currentAlertData;
         const closest = d.closest_fire;
-        const em = d.emergency_contacts || { country: "Local Dispatch", fire: "101", police: "100" };
+        const em = d.emergency_contacts || { country: "Local Dispatch", helpline: "112", fire: "101", police: "100", ambulance: "108" };
         const body = encodeURIComponent(
-            `EMERGENCY SOS: Fire threat ${closest ? closest.distance_km : 0}km from (${currentLat},${currentLon}). Evacuating along heading ${d.escape_heading ? d.escape_heading.degrees : 0}deg. Local Dispatch (${em.country}): Fire ${em.fire}, Police ${em.police}. Need assistance.`
+            `EMERGENCY SOS: Fire threat ${closest ? closest.distance_km : 0}km from (${currentLat},${currentLon}). Heading: ${d.escape_heading ? d.escape_heading.degrees : 0}deg. Local (${em.country}): Helpline ${em.helpline || '112'}, Fire ${em.fire || '101'}, Police ${em.police || '100'}. Need assistance.`
         );
         window.open(`sms:?body=${body}`, "_self");
     };
