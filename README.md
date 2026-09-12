@@ -1,4 +1,4 @@
-# 🔥 Geo-AI Fire & Industrial Thermal Anomaly Sentinel
+# Geo-AI Fire & Industrial Thermal Anomaly Sentinel
 ### Real-Time Planetary Satellite Intelligence, Tactical AI Threat Classification & Global Thermal Dynamics Engine
 
 > **Smart India Hackathon (SIH 2026) — Problem Statement SIH26162**  
@@ -884,8 +884,6 @@ Current operational parameters verified against live dual-satellite NASA VIIRS f
 - [x] Leaflet Canvas 60 FPS GPU Acceleration & NoGap Tile Seam Patch
 - [x] Automated Telegram Emergency Broadcast Webhooks
 - [x] ISRO Bhuvan LULC & MOSDAC INSAT Ingestion Connectors
-- [ ] Sentinel-5P TROPOMI Methane ($CH_4$) and Carbon Monoxide ($CO$) Plume Ingestion
-- [ ] Automated UAV / Drone Flight Path Waypoint Export (KML / Mission Planner) for Aerial Retardant Drops
 
 ---
 
