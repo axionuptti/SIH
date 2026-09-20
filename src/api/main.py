@@ -47,7 +47,8 @@ async def startup_event():
             except Exception as e:
                 print(f"Periodic live sync error: {e}")
                 
-    asyncio.create_task(sync_loop())
+    if not os.environ.get("VERCEL"):
+        asyncio.create_task(sync_loop())
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
@@ -66,7 +67,8 @@ async def add_no_cache_headers(request, call_next):
         response.headers["Expires"] = "0"
     return response
 
-os.makedirs("src/frontend", exist_ok=True)
+if not os.environ.get("VERCEL"):
+    os.makedirs("src/frontend", exist_ok=True)
 app.mount("/dashboard", StaticFiles(directory="src/frontend", html=True), name="frontend")
 
 @app.get("/", include_in_schema=False)
@@ -105,6 +107,10 @@ def alert_siren_route():
 _GEOJSON_CACHE = {}
 
 def load_geojson(path: str):
+    if os.environ.get("VERCEL") and "classified_hotspots.geojson" in path:
+        if os.path.exists("/tmp/classified_hotspots.geojson"):
+            path = "/tmp/classified_hotspots.geojson"
+            
     if os.path.exists(path):
         mtime = os.path.getmtime(path)
         if path in _GEOJSON_CACHE and _GEOJSON_CACHE[path]["mtime"] == mtime:
@@ -423,7 +429,7 @@ def destination_point(lat: float, lon: float, distance_km: float, bearing_deg: f
         math.cos(d_div_r) - math.sin(lat_rad) * math.sin(dest_lat_rad)
     )
 # ─── International Emergency Numbers Database (Location & Country-Aware) ──────
-from api.emergency_data import EMERGENCY_NUMBERS, DEFAULT_EMERGENCY
+from src.api.emergency_data import EMERGENCY_NUMBERS, DEFAULT_EMERGENCY
 
 def get_emergency_contacts(lat: float, lon: float):
     """Dynamically resolves local country, national helpline, police, ambulance, and fire brigade emergency hotlines using coordinates."""

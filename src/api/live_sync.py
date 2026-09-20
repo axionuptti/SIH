@@ -26,7 +26,10 @@ FIRMS_API_BASE = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
 AREA = "world"
 SYNC_INTERVAL_SECONDS = 600  # 10 minutes (per NASA 10-min rate limit policy)
 HEAVY_FIRE_MIN_FRP = 25.0    # Retain severe & heavy fires (FRP >= 25.0 MW)
-PROCESSED_GEOJSON_PATH = "data/processed/classified_hotspots.geojson"
+if os.environ.get("VERCEL"):
+    PROCESSED_GEOJSON_PATH = "/tmp/classified_hotspots.geojson"
+else:
+    PROCESSED_GEOJSON_PATH = "data/processed/classified_hotspots.geojson"
 
 SOURCES = [
     {"source": "VIIRS_SNPP_NRT", "name": "Suomi-NPP VIIRS (375m)", "priority": 1},
