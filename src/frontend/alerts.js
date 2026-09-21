@@ -1036,8 +1036,8 @@
     function renderMap(data) {
         if (!map) return;
 
-        // Center map
-        map.setView([currentLat, currentLon], getZoomLevel(currentRadiusKm));
+        // Center map smoothly to the new location
+        map.flyTo([currentLat, currentLon], getZoomLevel(currentRadiusKm), { animate: true, duration: 1.5 });
 
         // Clear dynamic layers
         if (userMarker) map.removeLayer(userMarker);
@@ -1082,10 +1082,13 @@
             fetchProximityAlerts(pos.lat, pos.lng, currentRadiusKm, `Custom Location (${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)})`);
         });
 
-        // 2. Threat Danger Rings
-        // 10km Red Zone
+        // 2. Threat Danger Rings (Dynamic based on selected radius)
+        const innerRadius = (currentRadiusKm * 1000) / 3;
+        const middleRadius = (currentRadiusKm * 1000) * (2 / 3);
+
+        // Inner Red Zone (33% of search radius)
         const dangerCircle = L.circle([currentLat, currentLon], {
-            radius: 10000,
+            radius: innerRadius,
             color: "#ef4444",
             fillColor: "#ef4444",
             fillOpacity: 0.08,
@@ -1094,9 +1097,9 @@
         }).addTo(map);
         bufferCircles.push(dangerCircle);
 
-        // 25km Orange Zone
+        // Middle Orange Zone (66% of search radius)
         const warningCircle = L.circle([currentLat, currentLon], {
-            radius: 25000,
+            radius: middleRadius,
             color: "#f97316",
             fillColor: "#f97316",
             fillOpacity: 0.04,
@@ -1105,13 +1108,14 @@
         }).addTo(map);
         bufferCircles.push(warningCircle);
 
-        // Dynamic Outer Perimeter
+        // Dynamic Outer Perimeter (100% of search radius)
         const outerCircle = L.circle([currentLat, currentLon], {
             radius: currentRadiusKm * 1000,
             color: "#38bdf8",
             fillColor: "#38bdf8",
             fillOpacity: 0.02,
-            weight: 1
+            weight: 1.5,
+            dashArray: "2, 4"
         }).addTo(map);
         bufferCircles.push(outerCircle);
 
