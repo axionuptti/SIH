@@ -25,6 +25,7 @@
     let sheltersLayer = null;
 
     let searchDebounceTimer = null;
+    let gpsWatchId = null;
     const STORAGE_KEY_CHECKED = "sih_evac_checked_steps_v1";
 
     // ── International Emergency Numbers Directory (45+ Countries Client Cache) ──
@@ -452,8 +453,8 @@
         document.addEventListener("keydown", unlockAudio, { passive: true });
         document.addEventListener("touchstart", unlockAudio, { passive: true });
 
-        // Initial scan for default preset (Dniprorudne)
-        fetchProximityAlerts(currentLat, currentLon, currentRadiusKm, currentLocationLabel, false);
+        // Start GPS tracking automatically on load
+        window.detectUserGPS();
     });
 
 
@@ -482,6 +483,7 @@
 
         // Interactive map click: Click anywhere on Earth to drop pin and analyze!
         map.on("click", (e) => {
+            window.stopGPSWatch();
             const { lat, lng } = e.latlng;
             document.getElementById("input-lat").value = lat.toFixed(4);
             document.getElementById("input-lon").value = lng.toFixed(4);
@@ -1317,6 +1319,7 @@
     function selectSearchResult(item) {
         const lat = parseFloat(item.lat);
         const lon = parseFloat(item.lon);
+        window.stopGPSWatch();
         document.getElementById("input-lat").value = lat.toFixed(4);
         document.getElementById("input-lon").value = lon.toFixed(4);
         document.getElementById("global-search-input").value = item.display_name;
@@ -1364,7 +1367,17 @@
         }
     }
 
-    // ── GPS Geolocation ──────────────────────────────────────────────────────
+    window.stopGPSWatch = function () {
+        if (gpsWatchId !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+            const btnText = document.getElementById("gps-btn-text");
+            if (btnText && btnText.textContent.includes("Tracking")) {
+                btnText.textContent = "📍 Use My Current Location (GPS)";
+            }
+        }
+    };
+
     window.detectUserGPS = function () {
         const btnText = document.getElementById("gps-btn-text");
         if (btnText) btnText.textContent = "Acquiring GPS Fix...";
@@ -1372,33 +1385,39 @@
         if (!navigator.geolocation) {
             alert("Geolocation is not supported by your browser. Please enter coordinates manually.");
             if (btnText) btnText.textContent = "📍 Use My Current Location (GPS)";
+            // Fallback to default
+            fetchProximityAlerts(currentLat, currentLon, currentRadiusKm, currentLocationLabel, false);
             return;
         }
 
-        navigator.geolocation.getCurrentPosition(
+        window.stopGPSWatch();
+
+        gpsWatchId = navigator.geolocation.watchPosition(
             (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 document.getElementById("input-lat").value = lat.toFixed(4);
                 document.getElementById("input-lon").value = lon.toFixed(4);
-                if (btnText) btnText.textContent = "📍 GPS Location Acquired!";
+                if (btnText) btnText.textContent = "📍 GPS Tracking Active";
                 clearActivePresetChips();
                 reverseGeocode(lat, lon);
                 fetchProximityAlerts(lat, lon, currentRadiusKm, `My GPS Coordinates (${lat.toFixed(3)}, ${lon.toFixed(3)})`);
-                setTimeout(() => {
-                    if (btnText) btnText.textContent = "📍 Use My Current Location (GPS)";
-                }, 3000);
             },
             (err) => {
                 console.warn("GPS error:", err);
-                alert(`GPS acquisition failed: ${err.message}. Defaulting to manual coordinate inputs.`);
+                if (err.code !== 3) { // Ignore timeout errors if tracking
+                    alert(`GPS acquisition failed: ${err.message}. Defaulting to manual coordinate inputs.`);
+                }
                 if (btnText) btnText.textContent = "📍 Use My Current Location (GPS)";
+                // Fallback to default
+                fetchProximityAlerts(currentLat, currentLon, currentRadiusKm, currentLocationLabel, false);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
     };
 
     window.loadPreset = function (lat, lon, name) {
+        window.stopGPSWatch();
         document.getElementById("input-lat").value = lat.toFixed(4);
         document.getElementById("input-lon").value = lon.toFixed(4);
 
@@ -1415,7 +1434,8 @@
     };
 
     window.handleCoordChange = function () {
-        const lat = parseFloat(document.getElementById("input-lat").value);
+        window.stopGPSWatch();
+        let lat = parseFloat(document.getElementById("input-lat").value);
         const lon = parseFloat(document.getElementById("input-lon").value);
         if (isNaN(lat) || isNaN(lon)) return;
         clearActivePresetChips();
